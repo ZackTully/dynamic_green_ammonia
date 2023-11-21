@@ -104,3 +104,9 @@ ENV/
 # IDE settings
 .vscode/
 .idea/
+
+# MAC stuff
+.DS_Store
+
+# Project Stuff
+data/
