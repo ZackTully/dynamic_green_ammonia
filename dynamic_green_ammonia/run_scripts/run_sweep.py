@@ -5,16 +5,7 @@ import time
 import sys
 from pathlib import Path
 
-file = Path(__file__).resolve()
-parent, root = file.parent, file.parents[2]
-sys.path.append(str(root))
-
-try:
-    sys.path.remove(str(parent))
-except ValueError:
-    pass
-
-from Dynamic_Load.technologies.Run_DL import RunDL
+from dynamic_green_ammonia.technologies.Run_DL import RunDL
 
 t0 = time.time()
 

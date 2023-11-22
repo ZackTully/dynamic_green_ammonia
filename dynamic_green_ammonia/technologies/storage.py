@@ -206,16 +206,46 @@ class DynamicAmmoniaStorage(BaseStorage):
             power_to_el=power_to_el,
             power_to_industry=power_to_industry,
         )
+
+        based_on_mean_generation = True  # base the plant on mean generation
+
         self.ramp_lim = ramp_lim
         self.optimize = optimize
         self.plant_min = plant_min
-        if plant_rating:
-            self.plant_rating = plant_rating
-        else:
-            self.plant_rating = np.mean(self.H2_gen) * ((1 - self.plant_min) / 2 + 1)
-            # self.plant_rating = np.max(self.H2_gen)
 
-        self.min_demand = self.plant_rating * self.plant_min
+        if based_on_mean_generation:
+            if plant_rating:
+                self.plant_rating = plant_rating
+            else:
+                self.plant_rating = np.mean(self.H2_gen) * (
+                    (1 - self.plant_min) / 2 + 1
+                )
+                # self.plant_rating = np.max(self.H2_gen)
+
+            self.min_demand = self.plant_rating * self.plant_min
+        else:  # best plant rating
+            hist, bins = np.histogram(self.H2_gen, bins=100)
+
+            capture = np.zeros(len(bins))
+
+            for i, mean in enumerate(bins):
+                max_demand = (2 / (self.plant_min + 1)) * mean
+                min_demand = self.plant_min * max_demand
+
+                min_idx = np.argmin(np.abs(bins - min_demand))
+                max_idx = np.argmin(np.abs(bins - max_demand))
+
+                if min_idx != max_idx:
+                    capture[i] = np.sum(hist[min_idx:max_idx]) / (
+                        np.sum(hist[0:min_idx]) + np.sum(hist[max_idx:])
+                    )
+
+            mean = bins[np.argmax(capture)]
+            max_demand = (2 / (self.plant_min + 1)) * mean
+            min_demand = self.plant_min * max_demand
+
+            self.plant_rating = max_demand
+            self.min_demand = min_demand
 
     def calc_H2_demand(self):
         """Calculate ramp rate H2 demand profile and required storage"""
@@ -269,10 +299,29 @@ class DynamicAmmoniaStorage(BaseStorage):
 
         ramp_lim = self.ramp_lim * self.plant_rating
 
+        demand_opt = DemandOptimization(
+            self.H2_gen, ramp_lim, self.min_demand, self.plant_rating
+        )
+        res = demand_opt.optimize()
+        n_steps = len(self.H2_gen)
+        self.H2_demand = res.x[0:n_steps]
+        storage_size = res.x[-2] - res.x[-1]
+        self.P_demand = self.P_ratio * self.H2_demand
+        self.calc_storage_requirements()
+
+
+class DemandOptimization:
+    def __init__(self, H2_gen, ramp_lim, min_demand, max_demand):
+        self.H2_gen = H2_gen
+        self.ramp_lim = ramp_lim
+        self.min_demand = min_demand
+        self.max_demand = max_demand
+
+    def optimize(self):
         n_steps = len(self.H2_gen)
 
         c = np.concatenate([np.zeros(2 * n_steps), [1, -1]])
-        c = np.concatenate([np.zeros(n_steps), [-1], np.zeros(n_steps - 2), [1, 1, -1]])
+        # c = np.concatenate([np.zeros(n_steps), [-1], np.zeros(n_steps - 2), [1, 1, -1]])
 
         A_ub = np.zeros([n_steps * 4, 2 * n_steps + 2])
         b_ub = np.zeros([n_steps * 4])
@@ -287,7 +336,7 @@ class DynamicAmmoniaStorage(BaseStorage):
             if i > 0:
                 A_ub[i + 2 * n_steps, [i, i - 1]] = [1, -1]
                 A_ub[i + 3 * n_steps, [i, i - 1]] = [-1, 1]
-            b_ub[[i + 2 * n_steps, i + 3 * n_steps]] = [ramp_lim, ramp_lim]
+            b_ub[[i + 2 * n_steps, i + 3 * n_steps]] = [self.ramp_lim, self.ramp_lim]
 
             b_eq[i] = self.H2_gen[i]
             if i == 0:
@@ -296,36 +345,9 @@ class DynamicAmmoniaStorage(BaseStorage):
             A_eq[i, [i, i + n_steps - 1, i + n_steps]] = [1, -1, 1]
 
         bound_low = [self.min_demand] * n_steps + [None] * (n_steps + 2)
-        bound_up = [self.plant_rating] * n_steps + [None] * (n_steps + 2)
+        bound_up = [self.max_demand] * n_steps + [None] * (n_steps + 2)
 
         bounds = [(bound_low[i], bound_up[i]) for i, bl in enumerate(bound_low)]
 
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, bounds=bounds)
-
-        self.H2_demand = res.x[0:n_steps]
-        storage_size = res.x[-2] - res.x[-1]
-        self.P_demand = self.P_ratio * self.H2_demand
-        self.calc_storage_requirements()
-
-
-# class DynamicSteelStorage(BaseStorage):
-#     def __init__(self, H2_gen=0, power_to_industry=0, process_duration=72):
-#         BaseStorage.__init__(self, H2_gen=H2_gen, power_to_industry=power_to_industry)
-#         self.process_duration = process_duration
-
-#     def calc_H2_demand(self):
-#         H2_diff = np.zeros(len(self.H2_gen))
-#         n_processes = int(np.floor(len(self.H2_gen) / self.process_duration)) + 1
-#         H2_avg = np.zeros(n_processes)
-
-#         for i in range(n_processes):
-#             i1 = i * self.process_duration
-#             i2 = (i + 1) * self.process_duration
-
-#             H2_avg[i] = np.mean(self.H2_gen[i1:i2])
-#             H2_diff[i1:i2] = H2_avg[i] - self.H2_gen[i1:i2]
-
-
-#         self.P_demand = P_demand
-#         self.H2_demand = H2_demand
-#         self.calc_storage_requirements()
+        return res

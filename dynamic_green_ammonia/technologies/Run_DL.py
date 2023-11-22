@@ -11,12 +11,15 @@ from hopp.simulation import HoppInterface
 from hopp.simulation.technologies.wind.wind_plant import WindPlant
 from hopp.simulation.technologies.pv.pv_plant import PVPlant
 from hopp.simulation.technologies.battery.battery import Battery
-from Dynamic_Load.technologies.chemical import (
+from dynamic_green_ammonia.technologies.chemical import (
     HaberBosch,
     AirSeparationUnit,
     Electrolzyer,
 )
-from Dynamic_Load.technologies.storage import SteadyStorage, DynamicAmmoniaStorage
+from dynamic_green_ammonia.technologies.storage import (
+    SteadyStorage,
+    DynamicAmmoniaStorage,
+)
 
 
 class RunDL:

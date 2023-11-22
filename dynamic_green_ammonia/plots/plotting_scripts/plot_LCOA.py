@@ -69,6 +69,7 @@ if plot_fig[0]:
     ax[1].set_ylabel("Lined LCOA")
     handles, labels = plot_LCOA_bars(ax[2], plant_costs, "salt")
     ax[2].set_ylabel("Salt LCOA")
+    ax[2].set_xlabel("Turndown Ratio")
     fig.legend(handles[::-1], labels[::-1], loc="outside right")
 
 # mng = plt.get_current_fig_manager()
@@ -217,7 +218,7 @@ count = 0
 while len(plt.gcf().axes) > 0:
     cf = plt.gcf()
     name = cf._suptitle.get_text()
-    cf.savefig(f"Dynamic_Load/plots/{name}.png", format="png", dpi=300)
+    cf.savefig(f"dynamic_green_ammonia/plots/{name}.png", format="png", dpi=300)
     plt.close(cf)
 
     if count > 5:
