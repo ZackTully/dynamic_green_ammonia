@@ -5,12 +5,12 @@ from matplotlib import cm
 
 from dynamic_green_ammonia.technologies.storage import DemandOptimization
 
-run_opt = False
+run_opt = True
 
 gen = np.load("dynamic_green_ammonia/run_scripts/hybrid_gen.npy")
 
 n_steps = len(gen)
-# n_steps = 100
+n_steps = 1000
 gen = gen[0:n_steps]
 
 
@@ -49,7 +49,7 @@ if run_opt:
             capacities[i, j] = capacity
             []
 
-    np.save("dynamic_green_ammonia/technologies/demand_opt_capacities.npy", capacities)
+    # np.save("dynamic_green_ammonia/technologies/demand_opt_capacities.npy", capacities)
 
 else:
     capacities = np.load("dynamic_green_ammonia/technologies/demand_opt_capacities.npy")
