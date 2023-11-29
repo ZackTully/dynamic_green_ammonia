@@ -21,11 +21,8 @@ from pathlib import Path
 
 
 rootdir = Path(__file__).parents[2]
-
 gen = np.load(rootdir / "data" / "hybrid_gen.npy")
-
 max_diff = np.max(np.abs(gen - np.roll(gen, 1)))
-
 n_steps = 4000
 
 

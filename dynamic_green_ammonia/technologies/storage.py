@@ -250,47 +250,52 @@ class DynamicAmmoniaStorage(BaseStorage):
     def calc_H2_demand(self):
         """Calculate ramp rate H2 demand profile and required storage"""
 
-        if self.optimize:
-            self.calc_H2_demand_opt()
+        # if (self.ramp_lim == 0) or (self.plant_min == 1):
+        #     BaseStorage.calc_H2_demand(self)
+        if False:
+            pass
         else:
-            self.P_ratio = np.sum(self.P_gen) / np.sum(
-                self.H2_gen
-            )  # ratio of power to hydrogen
+            if self.optimize:
+                self.calc_H2_demand_opt()
+            else:
+                self.P_ratio = np.sum(self.P_gen) / np.sum(
+                    self.H2_gen
+                )  # ratio of power to hydrogen
 
-            ramp_lim = self.ramp_lim * self.plant_rating
-            H2_demand = np.zeros(len(self.H2_gen))
-            P_demand = np.zeros(len(self.H2_gen))
-            H2_SOC_loop = 0
+                ramp_lim = self.ramp_lim * self.plant_rating
+                H2_demand = np.zeros(len(self.H2_gen))
+                P_demand = np.zeros(len(self.H2_gen))
+                H2_SOC_loop = 0
 
-            for i in range(len(self.H2_gen)):
-                if i == 0:
-                    H2_demand[i] = np.mean(self.H2_gen)
-                    continue
+                for i in range(len(self.H2_gen)):
+                    if i == 0:
+                        H2_demand[i] = np.mean(self.H2_gen)
+                        continue
 
-                # constrain hydrogen demand within the ramp limits
-                H2_delta = self.H2_gen[i] + H2_SOC_loop - H2_demand[i - 1]
-                if np.abs(H2_delta) > ramp_lim:  # exceeding ramp limit
-                    H2_dem = H2_demand[i - 1] + np.sign(H2_delta) * ramp_lim
-                else:
-                    extra_demand = ramp_lim - np.abs(H2_delta)
-                    storage_correction = np.min([extra_demand, np.abs(H2_SOC_loop)])
+                    # constrain hydrogen demand within the ramp limits
+                    H2_delta = self.H2_gen[i] + H2_SOC_loop - H2_demand[i - 1]
+                    if np.abs(H2_delta) > ramp_lim:  # exceeding ramp limit
+                        H2_dem = H2_demand[i - 1] + np.sign(H2_delta) * ramp_lim
+                    else:
+                        extra_demand = ramp_lim - np.abs(H2_delta)
+                        storage_correction = np.min([extra_demand, np.abs(H2_SOC_loop)])
 
-                    storage_FB = np.sign(H2_SOC_loop) * storage_correction
+                        storage_FB = np.sign(H2_SOC_loop) * storage_correction
 
-                    H2_dem = self.H2_gen[i] + storage_FB
+                        H2_dem = self.H2_gen[i] + storage_FB
 
-                # upper constraints on H2 demand
-                H2_dem = np.min([self.plant_rating, H2_dem])
-                # lower constraints on H2 demand
-                H2_dem = np.max([self.min_demand, H2_dem])
-                P_dem = self.P_ratio * H2_dem
-                H2_demand[i] = H2_dem
-                P_demand[i] = P_dem
-                H2_SOC_loop += self.H2_gen[i] - H2_demand[i]
+                    # upper constraints on H2 demand
+                    H2_dem = np.min([self.plant_rating, H2_dem])
+                    # lower constraints on H2 demand
+                    H2_dem = np.max([self.min_demand, H2_dem])
+                    P_dem = self.P_ratio * H2_dem
+                    H2_demand[i] = H2_dem
+                    P_demand[i] = P_dem
+                    H2_SOC_loop += self.H2_gen[i] - H2_demand[i]
 
-            self.P_demand = P_demand
-            self.H2_demand = H2_demand
-            self.calc_storage_requirements()
+                self.P_demand = P_demand
+                self.H2_demand = H2_demand
+                self.calc_storage_requirements()
 
     def calc_H2_demand_opt(self):
         self.P_ratio = np.sum(self.P_gen) / np.sum(
@@ -302,10 +307,10 @@ class DynamicAmmoniaStorage(BaseStorage):
         demand_opt = DemandOptimization(
             self.H2_gen, ramp_lim, self.min_demand, self.plant_rating
         )
-        res = demand_opt.optimize()
+        x, success = demand_opt.optimize()
         n_steps = len(self.H2_gen)
-        self.H2_demand = res.x[0:n_steps]
-        storage_size = res.x[-2] - res.x[-1]
+        self.H2_demand = x[0:n_steps]
+        storage_size = x[-2] - x[-1]
         self.P_demand = self.P_ratio * self.H2_demand
         self.calc_storage_requirements()
 
@@ -318,36 +323,51 @@ class DemandOptimization:
         self.max_demand = max_demand
 
     def optimize(self):
-        n_steps = len(self.H2_gen)
+        if self.min_demand >= self.max_demand:
+            demand = self.max_demand * np.ones(len(self.H2_gen))
+            storage_state = np.cumsum(self.H2_gen - demand)
+            state_max = np.max(storage_state)
+            state_min = np.min(storage_state)
+            x = np.concatenate([demand, storage_state, [state_max, state_min]])
+            success = True
 
-        c = np.concatenate([np.zeros(2 * n_steps), [1, -1]])
-        # c = np.concatenate([np.zeros(n_steps), [-1], np.zeros(n_steps - 2), [1, 1, -1]])
+        else:
+            n_steps = len(self.H2_gen)
 
-        A_ub = np.zeros([n_steps * 4, 2 * n_steps + 2])
-        b_ub = np.zeros([n_steps * 4])
-        A_eq = np.zeros([n_steps + 1, 2 * n_steps + 2])
-        b_eq = np.zeros(n_steps + 1)
+            c = np.concatenate([np.zeros(2 * n_steps), [1, -1]])
 
-        A_eq[-1, [n_steps, 2 * n_steps - 1]] = [1, -1]
-        for i in range(n_steps):
-            A_ub[i, [i + n_steps, -2]] = [1, -1]
-            A_ub[i + n_steps, [i + n_steps, -1]] = [-1, 1]
+            A_ub = np.zeros([n_steps * 4, 2 * n_steps + 2])
+            b_ub = np.zeros([n_steps * 4])
+            A_eq = np.zeros([n_steps + 1, 2 * n_steps + 2])
+            b_eq = np.zeros(n_steps + 1)
 
-            if i > 0:
-                A_ub[i + 2 * n_steps, [i, i - 1]] = [1, -1]
-                A_ub[i + 3 * n_steps, [i, i - 1]] = [-1, 1]
-            b_ub[[i + 2 * n_steps, i + 3 * n_steps]] = [self.ramp_lim, self.ramp_lim]
+            A_eq[-1, [n_steps, 2 * n_steps - 1]] = [1, -1]
+            for i in range(n_steps):
+                A_ub[i, [i + n_steps, -2]] = [1, -1]
+                A_ub[i + n_steps, [i + n_steps, -1]] = [-1, 1]
 
-            b_eq[i] = self.H2_gen[i]
-            if i == 0:
-                A_eq[0, [0, n_steps]] = [1, 1]
-                continue
-            A_eq[i, [i, i + n_steps - 1, i + n_steps]] = [1, -1, 1]
+                if i > 0:
+                    A_ub[i + 2 * n_steps, [i, i - 1]] = [1, -1]
+                    A_ub[i + 3 * n_steps, [i, i - 1]] = [-1, 1]
+                b_ub[[i + 2 * n_steps, i + 3 * n_steps]] = [
+                    self.ramp_lim,
+                    self.ramp_lim,
+                ]
 
-        bound_low = [self.min_demand] * n_steps + [None] * (n_steps + 2)
-        bound_up = [self.max_demand] * n_steps + [None] * (n_steps + 2)
+                b_eq[i] = self.H2_gen[i]
+                if i == 0:
+                    A_eq[0, [0, n_steps]] = [1, 1]
+                    continue
+                A_eq[i, [i, i + n_steps - 1, i + n_steps]] = [1, -1, 1]
 
-        bounds = [(bound_low[i], bound_up[i]) for i, bl in enumerate(bound_low)]
+            bound_low = [self.min_demand] * n_steps + [None] * (n_steps + 2)
+            # bound_low = [self.min_demand] * n_steps + [0] * n_steps + [None] * 2
 
-        res = linprog(c, A_ub, b_ub, A_eq, b_eq, bounds=bounds)
-        return res
+            bound_up = [self.max_demand] * n_steps + [None] * (n_steps + 2)
+
+            bounds = [(bound_low[i], bound_up[i]) for i, bl in enumerate(bound_low)]
+
+            res = linprog(c, A_ub, b_ub, A_eq, b_eq, bounds=bounds)
+            x = res.x
+            success = res.success
+        return x, success

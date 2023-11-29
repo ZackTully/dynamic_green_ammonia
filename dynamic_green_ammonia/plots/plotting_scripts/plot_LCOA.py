@@ -7,12 +7,12 @@ from matplotlib.lines import Line2D
 
 from pathlib import Path
 
-plot_fig = [True, False, False, False, True, True]
-plot_fig = [True] * 6
+plot_fig = [True, False, True, False, False, False]
+# plot_fig = [True] * 6
 
 top_dir = Path(__file__).parents[2]
 fname = "main_df_opt.csv"
-fname = "main_df_TX.csv"
+fname = "full_sweep_main_df_IN.csv"
 
 main_df = pd.read_csv(top_dir / "data" / "DL_runs" / fname)
 
@@ -20,8 +20,8 @@ main_df = pd.read_csv(top_dir / "data" / "DL_runs" / fname)
 ramp_lims = np.unique(main_df["ramp_lim"].to_numpy())
 plant_mins = np.unique(main_df["plant_min"].to_numpy())
 
-ramp_costs = main_df.loc[main_df["plant_min"] == plant_mins[1]]
-plant_costs = main_df.loc[main_df["ramp_lim"] == ramp_lims[0]]
+ramp_costs = main_df.loc[main_df["plant_min"] == plant_mins[3]]
+plant_costs = main_df.loc[main_df["ramp_lim"] == ramp_lims[3]]
 
 
 def plot_layer(ax: plt.Axes, df: pd.DataFrame, component: str, x, last_y: np.ndarray):
@@ -61,16 +61,20 @@ def plot_LCOA_bars(ax: plt.Axes, df: pd.DataFrame, tech: str):
 
 
 if plot_fig[0]:
-    fig, ax = plt.subplots(3, 1, sharex="col", sharey="col")
+    fig, ax = plt.subplots(1, 3, sharex="row", sharey="row")
     fig.suptitle("LCOA breakdown")
     handles, labels = plot_LCOA_bars(ax[0], plant_costs, "pipe")
-    ax[0].set_ylabel("Pipe LCOA")
+    ax[0].set_ylabel("LCOA [USD]")
+    ax[0].set_title("Pipe storage")
+    ax[0].set_xlabel("Turndown Ratio")
     handles, labels = plot_LCOA_bars(ax[1], plant_costs, "lined")
-    ax[1].set_ylabel("Lined LCOA")
+    ax[1].set_title("Lined cavern")
+    ax[1].set_xlabel("Turndown Ratio")
     handles, labels = plot_LCOA_bars(ax[2], plant_costs, "salt")
-    ax[2].set_ylabel("Salt LCOA")
+    ax[2].set_title("Salt cavern")
     ax[2].set_xlabel("Turndown Ratio")
     fig.legend(handles[::-1], labels[::-1], loc="outside right")
+    # fig.subplots_adjust(right=0.85)
 
 # mng = plt.get_current_fig_manager()
 # mng.full_screen_toggle()
@@ -210,7 +214,7 @@ if plot_fig[5]:
     ax[3].set_ylabel("Haber Bosch cost [USD]")
     ax3.set_ylabel("Storage capacity [kg]")
 
-
+# plt.show()
 # Save all figures
 
 count = 0

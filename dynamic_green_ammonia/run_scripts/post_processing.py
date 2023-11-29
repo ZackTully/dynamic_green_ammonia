@@ -94,9 +94,7 @@ lined_percdiff = (1 - LCOA_lined / steady_ish["LCOA_lined"].to_numpy()) * 100
 salt_percdiff = (1 - LCOA_salt / steady_ish["LCOA_salt"].to_numpy()) * 100
 
 
-pipe_norm = TwoSlopeNorm(
-    vmin=pipe_percdiff.min() - 1e-5, vcenter=0, vmax=pipe_percdiff.max()
-)
+pipe_norm = TwoSlopeNorm(vmin=-pipe_percdiff.max(), vcenter=0, vmax=pipe_percdiff.max())
 
 lined_norm = TwoSlopeNorm(
     vmin=lined_percdiff.min() - 1e-5, vcenter=0, vmax=lined_percdiff.max()
@@ -112,11 +110,11 @@ fig.colorbar(c, ax=ax[0, 1])
 ax[0, 1].set_title("Pipe LCOA Percent reduction")
 
 
-c = ax[1, 0].pcolormesh(rls, tds, lined_percdiff, norm=lined_norm, cmap="RdBu")
+c = ax[1, 0].pcolormesh(rls, tds, lined_percdiff, norm=pipe_norm, cmap="RdBu")
 fig.colorbar(c, ax=ax[1, 0])
 ax[1, 0].set_title("Lined LCOA Percent reduction")
 
-c = ax[1, 1].pcolormesh(rls, tds, salt_percdiff, norm=salt_norm, cmap="RdBu")
+c = ax[1, 1].pcolormesh(rls, tds, salt_percdiff, norm=pipe_norm, cmap="RdBu")
 fig.colorbar(c, ax=ax[1, 1])
 ax[1, 1].set_title("Salt LCOA Percent reduction")
 

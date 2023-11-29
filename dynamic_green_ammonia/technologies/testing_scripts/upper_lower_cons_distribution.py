@@ -4,12 +4,50 @@ import matplotlib.pyplot as plt
 
 from dynamic_green_ammonia.technologies.storage import DemandOptimization
 
-
 gen = np.load("dynamic_green_ammonia/run_scripts/hybrid_gen.npy")
 
 fig, ax = plt.subplots(1, 1)
 
-n, bins, patches = ax.hist(gen, bins=250, density=False)
+n, bins, patches = ax.hist(gen, bins=100, density=True)
+
+td = 0.5
+ramp_limit = 0.1
+
+max_demand = (2 / (td + 1)) * np.mean(gen)
+min_demand = td * max_demand
+ramp_lim = ramp_limit * max_demand
+
+
+ax.plot(
+    [min_demand, max_demand], [np.max(n) / 2] * 2, color="black", linestyle="dashed"
+)
+ax.plot([0, min_demand], [np.max(n) / 2] * 2, color="black", linestyle="solid")
+
+ax.plot(np.mean(gen), np.max(n) / 2, "r.", markersize=10)
+ax.plot(min_demand, np.max(n) / 2, "k.", markersize=10)
+ax.plot(max_demand, np.max(n) / 2, "k.", markersize=10)
+ax.plot(0, np.max(n) / 2, "k.", markersize=10)
+
+ax.set_xlabel("H2 generation [kg/hr]")
+ax.set_ylabel("Probability density")
+
+
+# With Zack approach
+DO = DemandOptimization(gen, ramp_lim, min_demand, max_demand)
+x, success = DO.optimize()
+capacity = x[-2] - x[-1]
+print(f"Capacity (mean): {capacity:.2f}")
+
+# With a slight shift downwards
+shift = 500
+DO = DemandOptimization(
+    gen, ramp_limit * (max_demand + shift), min_demand + shift, max_demand + shift
+)
+x, success = DO.optimize()
+capacity = x[-2] - x[-1]
+print(f"Capacity (shifted): {capacity:.2f}")
+
+plt.show()
 
 # gen = gen[0:1000]
 n_steps = len(gen)
@@ -24,6 +62,9 @@ n_mins = 1
 ramp_lims = np.exp(np.linspace(np.log(0.01), np.log(1), n_ramps))
 TD_ratios = 1 - np.logspace(np.log10(0.99), -2, n_mins)
 
+
+ramp_lims = [0.75]
+TD_ratios = [0.01]
 
 mean_caps = np.zeros([n_ramps, n_mins])
 best_caps = np.zeros([n_ramps, n_mins])
@@ -43,8 +84,8 @@ for i in range(len(ramp_lims)):
         ramp_lim = ramp_limit * max_demand
 
         DO = DemandOptimization(gen, ramp_lim, min_demand, max_demand)
-        res = DO.optimize()
-        capacity = res.x[-2] - res.x[-1]
+        x, success = DO.optimize()
+        capacity = x[-2] - x[-1]
         print(f"Capacity (mean): {capacity:.2f}")
 
         mean_caps[i, j] = capacity
@@ -68,11 +109,11 @@ for i in range(len(ramp_lims)):
         min_demand = td * max_demand
 
         DO = DemandOptimization(gen, ramp_lim, min_demand, max_demand)
-        res = DO.optimize()
-        if not res.success:
+        x, success = DO.optimize()
+        if not success:
             print("best failed to converge")
             continue
-        capacity = res.x[-2] - res.x[-1]
+        capacity = x[-2] - x[-1]
 
         print(f"Capacity (best): {capacity:.2f}")
         best_caps[i, j] = capacity
@@ -83,9 +124,9 @@ diff = best_caps - mean_caps
 rls, tds = np.meshgrid(ramp_lims, TD_ratios)
 diff_max = np.abs(diff).max()
 fig, ax = plt.subplots(1, 1)
-c = ax.pcolormesh(rls, tds, diff, cmap="RdBu", vmin=-diff_max, vmax=diff_max)
-ax.axis([rl.min(), rl.max(), td.min(), td.max()])
-fig.colorbar(c, ax=ax)
+# c = ax.pcolormesh(rls, tds, diff, cmap="RdBu", vmin=-diff_max, vmax=diff_max)
+# ax.axis([rl.min(), rl.max(), td.min(), td.max()])
+# fig.colorbar(c, ax=ax)
 
 # plt.show()
 
@@ -164,6 +205,6 @@ ax[0].set_title("demand")
 ax[1].plot(charge)
 ax[1].set_title("charge")
 fig.suptitle(f"Storage Capacity: {capacity:.2f}")
-
+fig.savefig("dynamic_green_ammonia/plots/LCOA_heatmap.png", dpi=300, format="png")
 plt.show()
 []

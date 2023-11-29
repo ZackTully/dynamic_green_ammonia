@@ -102,6 +102,12 @@ class RunDL:
         # DA.calc_storage()
         DA.run(siteinfo)
 
+        self.P2ASU, self.P2HB = np.atleast_2d(
+            self.energypkg[1:] / np.sum(self.energypkg[1:])
+        ).T @ np.atleast_2d(DA.P_out)
+
+        self.H2_storage_out = DA.H2_out
+
         self.H2_storage = DA
 
     def calc_chemicals(self):
@@ -112,10 +118,10 @@ class RunDL:
         for i in range(len(self.P2EL)):
             # H2, EL_reject = EL.step(P2EL[i])
             N2, ASU_reject = self.ASU.step(self.P2ASU[i])
-            NH3, HB_reject = self.HB.step(self.H2_gen[i], N2, self.P2HB[i])
+            NH3, HB_reject = self.HB.step(self.H2_storage_out[i], N2, self.P2HB[i])
 
             powers[i, :] = [self.P2EL[i], self.P2ASU[i], self.P2HB[i]]
-            chemicals[i, :] = [self.H2_gen[i], N2, NH3]
+            chemicals[i, :] = [self.H2_storage_out[i], N2, NH3]
 
         H2_tot, N2_tot, NH3_tot = np.sum(chemicals, axis=0)
         H2_max, N2_max, NH3_max = np.max(chemicals, axis=0)
@@ -234,9 +240,9 @@ class RunDL:
         self.main_dict.update(self.LCOA_dict)
 
     def run(self, ramp_lim=None, plant_min=None):
-        if plant_min:
+        if not (plant_min == None):
             self.ammonia_plant_turndown_ratio = plant_min
-        if ramp_lim:
+        if not (ramp_lim == None):
             self.ammonia_ramp_limit = ramp_lim
 
         # 2. inputs and outputs paths
@@ -301,3 +307,38 @@ class RunDL:
         self.main_df = pd.DataFrame(self.main_dict, index=[0])
 
         []
+
+
+def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
+    """Generate the ramp limits and turndown ratios for an analysis sweep
+
+    inputs:
+    analysis: either "simple" or "full sweep" which type of analysis the user is performing
+    n_ramps: number of ramp limits to return
+    n_tds: number of turndown ratios to return
+
+    returns:
+    ramp_lims: array of ramp_limits to simulate
+    TD_ratios: array of turndown ratios to simulate
+    """
+
+    if analysis == "simple":
+        # 5 cases
+
+        ramp_lims = [1, 0.01, 0.99, 0]
+        turndowns = [0, 0.01, 0.99, 1]
+
+    elif analysis == "full_sweep":
+        ramp_lims = np.concatenate([[0], np.logspace(-6, 0, 7)])
+        turndowns = np.linspace(0, 1, 8)
+        # if n_ramps > 1:
+        #     ramp_lims = np.exp(np.linspace(np.log(0.01), np.log(1), n_ramps))
+        # else:
+        #     ramp_lims = [0.1]
+
+        # if n_tds > 1:
+        #     turndowns = 1 - np.logspace(np.log10(0.99), -2, n_tds)
+        # else:
+        #     turndowns = [0.25]
+
+    return ramp_lims, turndowns
