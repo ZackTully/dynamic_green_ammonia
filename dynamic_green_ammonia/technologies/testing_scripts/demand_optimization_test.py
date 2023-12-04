@@ -1,24 +1,30 @@
+# %%
+
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import cm
-
+from matplotlib import cm, ticker
+from matplotlib.patches import Rectangle
 
 from dynamic_green_ammonia.technologies.storage import DemandOptimization
 
+# %%
 run_opt = True
+
+rl_realistic = 0.2
+td_realistic = 0.6
 
 gen = np.load("dynamic_green_ammonia/run_scripts/hybrid_gen.npy")
 
 n_steps = len(gen)
-# n_steps = 1000
+# n_steps = 200
 gen = gen[0:n_steps]
 
-n_opts = 4
+n_opts = 16
 
 # ramp_lims = np.array([0, 0.00001, 0.0001, 0.001, 0.01, 0.99, 1])
 # turndowns = np.array([0, 0.01, 0.25, 0.5, 0.75, 0.99, 1])
 
-ramp_lims = np.concatenate([[0], np.logspace(-6, 0, n_opts - 1)])
+ramp_lims = np.concatenate([[0], np.logspace(-5, 0, n_opts - 1)])
 turndowns = np.linspace(0, 1, n_opts)
 # turndowns += 2e-1 * np.round(np.sin(np.linspace(0, 2 * np.pi, len(turndowns))), 6)
 
@@ -38,8 +44,8 @@ if run_opt:
             )
             count += 1
 
-            # center = np.interp(td, [0, 1], [np.max(gen) / 2, np.mean(gen)])
-            center = np.mean(gen)
+            center = np.interp(td, [0, 1], [np.max(gen) / 2, np.mean(gen)])
+            # center = np.mean(gen)
 
             max_demand = (2 / (td + 1)) * center
             min_demand = td * max_demand
@@ -58,7 +64,7 @@ if run_opt:
             initial_state[i, j] = x[n_steps]
             []
 
-    # np.save("dynamic_green_ammonia/technologies/demand_opt_capacities.npy", capacities)
+    np.save("dynamic_green_ammonia/technologies/demand_opt_capacities.npy", capacities)
 
 else:
     capacities = np.load("dynamic_green_ammonia/technologies/demand_opt_capacities.npy")
@@ -69,6 +75,7 @@ colors = np.linspace(
     np.array([10, 79, 191]) / 255, np.array([217, 235, 19]) / 255, len(ramp_lims)
 )
 
+
 for i in range(len(ramp_lims)):
     ax[0].plot(
         turndowns,
@@ -77,6 +84,27 @@ for i in range(len(ramp_lims)):
         marker=".",
         label=f"RL={ramp_lims[i]:.3f}",
     )
+ax0_ylim = ax[0].get_ylim()
+
+
+realistic_kwargs = {"color": "black", "linestyle": "dashed"}
+
+ax[0].plot(
+    [td_realistic, td_realistic],
+    [ax0_ylim[0] - 1e6, ax0_ylim[1] + 1e6],
+    **realistic_kwargs,
+)
+ax[0].set_ylim(ax0_ylim)
+
+ax[0].plot(
+    turndowns,
+    [
+        np.interp(rl_realistic, ramp_lims, capacities[:, i])
+        for i in range(len(turndowns))
+    ],
+    **realistic_kwargs,
+)
+
 ax[0].legend()
 ax[0].set_xlabel("turndown ratio")
 ax[0].set_ylabel("Capacity")
@@ -90,9 +118,28 @@ for j in range(len(turndowns)):
         marker=".",
         label=f"TD={turndowns[j]:.3f}",
     )
+ax1_ylims = ax[1].get_ylim()
+ax[1].plot(
+    [rl_realistic, rl_realistic],
+    [ax1_ylims[0] - 1e6, ax1_ylims[1] * 1.5],
+    **realistic_kwargs,
+)
+ax[1].plot(
+    ramp_lims,
+    [
+        np.interp(td_realistic, turndowns, capacities[i, :])
+        for i in range(len(ramp_lims))
+    ],
+    **realistic_kwargs,
+)
+ax[1].set_ylim(ax1_ylims)
+
 ax[1].legend()
 ax[1].set_xlabel("ramp limit")
 ax[1].set_xscale("log")
+
+plt.show()
+[]
 
 
 def make_surface_plot(data, zlabel):
@@ -117,18 +164,50 @@ make_surface_plot(capacities, "Capacity [kg]")
 # make_surface_plot(initial_state / capacities, "Initial SOC")
 
 
-def make_contour_plot(data, zlabel):
-    fig, ax = plt.subplots(1, 1)
-    ramp_lims_fake = np.linspace(0, 1, len(ramp_lims))
-    RL, TD = np.meshgrid(ramp_lims_fake, turndowns)
-    ax.contourf(RL, TD, data)
-    CS = ax.contour(RL, TD, data)
-    ax.clabel(CS, CS.levels, inline=True, colors="black")
+data = capacities
 
-    []
+# def make_contour_plot(data, zlabel):
+fig, ax = plt.subplots(1, 1)
+ramp_lims_fake = np.linspace(0, 1, len(ramp_lims))
+RL, TD = np.meshgrid(ramp_lims_fake, turndowns)
 
+n_levels = 15
+# levels = np.linspace(np.min(data), np.max(data), n_levels)
 
-make_contour_plot(capacities, "Capacity [kg]")
+curviness = 1
+interp_locs = np.log(np.linspace(np.exp(0), np.exp(curviness), n_levels)) / curviness
+
+levels = np.interp(interp_locs, [0, 1], [np.min(data), np.max(data)])
+
+# color_kwargs = {"cmap": cm.plasma, "vmin": np.min(data), "vmax": np.max(data)}
+color_kwargs = {"cmap": cm.plasma, "vmin": 1e5, "vmax": np.max(data)}
+
+CSf = ax.contourf(RL, TD, data, alpha=1, levels=levels, **color_kwargs)
+CS1 = ax.contour(RL, TD, data, levels=levels, **color_kwargs)
+
+rect_kwargs = {"alpha": 0.5, "facecolor": "white"}
+rect1 = Rectangle([0, 0], rl_realistic, 1, **rect_kwargs)
+rect2 = Rectangle(
+    [rl_realistic, td_realistic], 1 - rl_realistic, 1 - td_realistic, **rect_kwargs
+)
+ax.add_patch(rect1)
+ax.add_patch(rect2)
+
+ax.plot([rl_realistic, rl_realistic], [0, td_realistic], color="black")
+ax.plot([rl_realistic, 1], [td_realistic, td_realistic], color="black")
+
+# ax.contourf(RL_realistic, TD_realistic, data_realistic, alpha=1, **color_kwargs)
+
+ax.clabel(CS1, CS1.levels, inline=True, colors="black")
+cbar = fig.colorbar(CSf)
+ax.set_xticks(ramp_lims_fake, np.flip(ramp_lims))
+ax.set_yticks(turndowns, np.flip(np.round(turndowns, 2)))
+ax.invert_xaxis()
+ax.set_xlabel("ramp limit")
+ax.set_ylabel("turndown ratio")
+
+plt.show()
+# make_contour_plot(capacities, "Capacity [kg]")
 
 
 # fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})

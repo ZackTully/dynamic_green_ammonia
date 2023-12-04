@@ -416,7 +416,7 @@ class DemandOptimization:
 
         # Cost vector
         C = np.zeros(N + N + 2)
-        C[N : N + N] = 1 * np.ones(N)
+        # C[N : N + N] = 1 * np.ones(N)
         C[2 * N + 0] = 1  # highest storage state
         C[2 * N + 1] = -1  # lowest storage state
 
