@@ -1,3 +1,12 @@
+
+"""
+TODO:
+1. Separate HOPP run so it only needs to be run once.
+2. Make it so that the demand optimization can be run all at once. 
+3. 
+
+"""
+
 # 1. import modules
 import numpy as np
 from pathlib import Path

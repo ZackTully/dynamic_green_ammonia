@@ -176,7 +176,6 @@ n_levels = 15
 
 curviness = 1
 interp_locs = np.log(np.linspace(np.exp(0), np.exp(curviness), n_levels)) / curviness
-
 levels = np.interp(interp_locs, [0, 1], [np.min(data), np.max(data)])
 
 # color_kwargs = {"cmap": cm.plasma, "vmin": np.min(data), "vmax": np.max(data)}
