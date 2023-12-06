@@ -10,6 +10,7 @@ from dynamic_green_ammonia.technologies.Run_DL import RunDL, FlexibilityParamete
 t0 = time.time()
 
 hopp_inputs = ["inputs/hopp_input_IN.yaml", "inputs/hopp_input_TX.yaml"]
+count = 1
 
 for hopp_input in hopp_inputs:
     DL = RunDL(
@@ -28,17 +29,18 @@ for hopp_input in hopp_inputs:
 
     dfs = []
 
-    count = 1
+    
     t_prev = t0
     for i, rl in enumerate(ramp_lims):
         for j, pm in enumerate(turndowns):
             DL.run(ramp_lim=rl, plant_min=pm)
             print(
-                f"Completed {count} out of {len(ramp_lims)*len(turndowns)}. Ramp rate: {rl:.3f}, turndown: {pm:.3f}"
+                f"Completed {count} out of {len(ramp_lims)*len(turndowns)*len(hopp_inputs)}. Ramp rate: {rl:.3f}, turndown: {pm:.3f}"
             )
             print(
-                f"Took {time.time() - t_prev:.2f} seconds, maybe {(time.time() - t0) / count*((len(ramp_lims)*len(turndowns) - count)):.2f} more seconds"
+                f"Took {time.time() - t_prev:.2f} seconds, maybe {(time.time() - t0) / (count/(len(ramp_lims)*len(turndowns)*len(hopp_inputs))):.2f} more seconds"
             )
+
             t_prev = time.time()
             dfs.append(DL.main_df.copy())
             count += 1

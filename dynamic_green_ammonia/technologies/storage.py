@@ -209,7 +209,7 @@ class DynamicAmmoniaStorage(BaseStorage):
             power_to_industry=power_to_industry,
         )
 
-        based_on_mean_generation = True  # base the plant on mean generation
+        based_on_mean_generation = False  # base the plant on mean generation
 
         self.ramp_lim = ramp_lim
         self.optimize = optimize
@@ -227,24 +227,34 @@ class DynamicAmmoniaStorage(BaseStorage):
 
             self.min_demand = self.plant_rating * self.plant_min
         else:  # best plant rating
-            hist, bins = np.histogram(self.H2_gen, bins=100)
+            # hist, bins = np.histogram(self.H2_gen, bins=100)
 
-            capture = np.zeros(len(bins))
+            # capture = np.zeros(len(bins))
 
-            for i, mean in enumerate(bins):
-                max_demand = (2 / (self.plant_min + 1)) * mean
-                min_demand = self.plant_min * max_demand
+            # for i, mean in enumerate(bins):
+            #     max_demand = (2 / (self.plant_min + 1)) * mean
+            #     min_demand = self.plant_min * max_demand
 
-                min_idx = np.argmin(np.abs(bins - min_demand))
-                max_idx = np.argmin(np.abs(bins - max_demand))
+            #     min_idx = np.argmin(np.abs(bins - min_demand))
+            #     max_idx = np.argmin(np.abs(bins - max_demand))
 
-                if min_idx != max_idx:
-                    capture[i] = np.sum(hist[min_idx:max_idx]) / (
-                        np.sum(hist[0:min_idx]) + np.sum(hist[max_idx:])
-                    )
+            #     if min_idx != max_idx:
+            #         capture[i] = np.sum(hist[min_idx:max_idx]) / (
+            #             np.sum(hist[0:min_idx]) + np.sum(hist[max_idx:])
+            #         )
 
-            mean = bins[np.argmax(capture)]
-            max_demand = (2 / (self.plant_min + 1)) * mean
+            # mean = bins[np.argmax(capture)]
+            # max_demand = (2 / (self.plant_min + 1)) * mean
+            # min_demand = self.plant_min * max_demand
+
+            center = (
+                self.plant_min * np.mean(self.H2_gen)
+                + (1 - self.plant_min) * np.max(self.H2_gen) / 2
+            )
+            center = np.interp(
+                self.plant_min, [0, 1], [np.max(self.H2_gen) / 2, np.mean(self.H2_gen)]
+            )
+            max_demand = center * (2 / (1 + self.plant_min))
             min_demand = self.plant_min * max_demand
 
             self.plant_rating = max_demand

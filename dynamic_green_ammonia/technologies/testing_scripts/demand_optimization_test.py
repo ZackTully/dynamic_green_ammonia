@@ -8,7 +8,7 @@ from matplotlib.patches import Rectangle
 from dynamic_green_ammonia.technologies.storage import DemandOptimization
 
 # %%
-run_opt = True
+run_opt = False
 
 rl_realistic = 0.2
 td_realistic = 0.6
@@ -19,7 +19,7 @@ n_steps = len(gen)
 # n_steps = 200
 gen = gen[0:n_steps]
 
-n_opts = 16
+n_opts = 8
 
 # ramp_lims = np.array([0, 0.00001, 0.0001, 0.001, 0.01, 0.99, 1])
 # turndowns = np.array([0, 0.01, 0.25, 0.5, 0.75, 0.99, 1])
@@ -64,10 +64,23 @@ if run_opt:
             initial_state[i, j] = x[n_steps]
             []
 
-    np.save("dynamic_green_ammonia/technologies/demand_opt_capacities.npy", capacities)
+    np.save(
+        "dynamic_green_ammonia/technologies/testing_scripts/demand_opt_capacities.npy",
+        capacities,
+    )
+    np.save(
+        "dynamic_green_ammonia/technologies/testing_scripts/demand_opt_initial_state.npy",
+        initial_state,
+    )
 
 else:
-    capacities = np.load("dynamic_green_ammonia/technologies/demand_opt_capacities.npy")
+    capacities = np.load(
+        "dynamic_green_ammonia/technologies/testing_scripts/demand_opt_capacities.npy"
+    )
+    initial_state = np.load(
+        "dynamic_green_ammonia/technologies/testing_scripts/deamdn_opt_initial_state.npy"
+    )
+
 
 fig, ax = plt.subplots(1, 2, sharey="row")
 
@@ -138,9 +151,6 @@ ax[1].legend()
 ax[1].set_xlabel("ramp limit")
 ax[1].set_xscale("log")
 
-plt.show()
-[]
-
 
 def make_surface_plot(data, zlabel):
     fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
@@ -149,7 +159,7 @@ def make_surface_plot(data, zlabel):
     surf = ax.plot_surface(RL, TD, data, cmap=cm.plasma)
     cbar = fig.colorbar(surf, shrink=0.5, aspect=7)
 
-    ax.set_xticks(ramp_lims_fake, np.flip(ramp_lims))
+    ax.set_xticks(ramp_lims_fake, np.flip(np.round(ramp_lims, 4)))
     ax.set_yticks(turndowns, np.flip(np.round(turndowns, 2)))
     ax.set_zticklabels([])
     ax.set_xlabel("ramp limit")
@@ -157,11 +167,12 @@ def make_surface_plot(data, zlabel):
     cbar.set_label(zlabel)
     ax.invert_xaxis()
     ax.invert_yaxis()
+    fig.subplots_adjust(left=0, bottom=0.05, right=1, top=1)
 
 
 make_surface_plot(capacities, "Capacity [kg]")
-# make_surface_plot(initial_state, "Initial state [kg]")
-# make_surface_plot(initial_state / capacities, "Initial SOC")
+make_surface_plot(initial_state, "Initial state [kg]")
+make_surface_plot(initial_state / capacities, "Initial SOC")
 
 
 data = capacities
@@ -199,7 +210,7 @@ ax.plot([rl_realistic, 1], [td_realistic, td_realistic], color="black")
 
 ax.clabel(CS1, CS1.levels, inline=True, colors="black")
 cbar = fig.colorbar(CSf)
-ax.set_xticks(ramp_lims_fake, np.flip(ramp_lims))
+ax.set_xticks(ramp_lims_fake, np.flip(np.round(ramp_lims, 4)))
 ax.set_yticks(turndowns, np.flip(np.round(turndowns, 2)))
 ax.invert_xaxis()
 ax.set_xlabel("ramp limit")

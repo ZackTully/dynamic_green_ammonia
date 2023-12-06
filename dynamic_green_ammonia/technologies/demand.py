@@ -63,9 +63,7 @@ class DemandOptimization:
 
         # bound_low = [self.min_demand] * n_steps + [None] * (n_steps + 2)
         bound_low = [self.min_demand] * n_steps + [0] * n_steps + [None] * 2
-
         bound_up = [self.max_demand] * n_steps + [None] * (n_steps + 2)
-
         bounds = [(bound_low[i], bound_up[i]) for i, bl in enumerate(bound_low)]
 
         res = linprog(c, A_ub, b_ub, A_eq, b_eq, bounds=bounds)

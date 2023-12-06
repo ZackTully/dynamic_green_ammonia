@@ -37,7 +37,7 @@ ramp_lims = np.unique(main_df["ramp_lim"].to_numpy())
 turndowns = np.unique(main_df["plant_min"].to_numpy())
 
 rl_realistic = 0.2
-td_realistic = 0.5
+td_realistic = 0.6
 
 # %% Plotting helper methods
 
@@ -109,7 +109,7 @@ def plot_surface(fig, ax, data_name):
     # ax.invert_yaxis()
     # ax.invert_xaxis()
     cbar.set_label(data_name)
-
+    ax.view_init(elev=35, azim=135, roll=0)
 
 def plot_heat(fig, ax, data_name):
     RL, TD, data = get_3d_things(ramp_lims, turndowns, data_name)
