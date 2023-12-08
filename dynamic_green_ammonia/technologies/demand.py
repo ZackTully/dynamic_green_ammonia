@@ -6,6 +6,7 @@ class DemandOptimization:
     def __init__(self, H2_gen, ramp_lim, min_demand, max_demand):
         self.optimization_version = 2
         self.H2_gen = H2_gen
+        self.N = len(self.H2_gen)  # number of time steps in optimization
         self.ramp_lim = ramp_lim
         self.min_demand = min_demand
         self.max_demand = max_demand
@@ -14,13 +15,18 @@ class DemandOptimization:
         if self.min_demand >= self.max_demand:
             # if False:
             x, success = self.static_demand()
+            res = None
         else:
             if self.optimization_version == 1:
                 x, success, res = self.optimize_v1()
             elif self.optimization_version == 2:
                 x, success, res = self.optimize_v2()
 
-        return x, success
+        self.demand = x[0 : self.N]
+        self.state = x[self.N : 2 * self.N]
+        self.capacity = x[-2] - x[-1]
+
+        return x, success, res
 
     def static_demand(self):
         demand = self.max_demand * np.ones(len(self.H2_gen))
@@ -208,3 +214,20 @@ class DemandOptimization:
         )
 
         return res.x, res.success, res
+
+    def calc_proportional_demand(self, signal_ref, signal_des):
+        """Return a demand profile proportional to the optimized demand profile by a
+        factor of sum(signal_des) / sum(signal_ref)
+
+        Args:
+        signal_ref:
+        signal_des:
+
+        Returns:
+        demand:
+        state:
+        capacity:
+        """
+
+        factor = np.sum(signal_des) / np.sum(signal_ref)
+        return factor * self.demand, factor * self.state, factor * self.capacity

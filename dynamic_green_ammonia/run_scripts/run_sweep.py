@@ -17,10 +17,10 @@ for hopp_input in hopp_inputs:
         hopp_input,
         ammonia_ramp_limit=0.1,
         ammonia_plant_turndown_ratio=0.1,
-        dynamic_load=True,
     )
 
-    analysis_type = "full_sweep"
+    # analysis_type = "full_sweep"
+    analysis_type = "simple"
 
     ramp_lims, turndowns = FlexibilityParameters(analysis=analysis_type)
     # ramp_lims, turndowns = FlexibilityParameters(
@@ -29,7 +29,6 @@ for hopp_input in hopp_inputs:
 
     dfs = []
 
-    
     t_prev = t0
     for i, rl in enumerate(ramp_lims):
         for j, pm in enumerate(turndowns):

@@ -1,4 +1,3 @@
-
 """
 TODO:
 1. Separate HOPP run so it only needs to be run once.
@@ -29,6 +28,7 @@ from dynamic_green_ammonia.technologies.storage import (
     SteadyStorage,
     DynamicAmmoniaStorage,
 )
+from dynamic_green_ammonia.technologies.demand import DemandOptimization
 
 
 class RunDL:
@@ -49,17 +49,20 @@ class RunDL:
         hopp_input,
         ammonia_ramp_limit,
         ammonia_plant_turndown_ratio,
-        dynamic_load=True,
     ):
         self.hopp_input = hopp_input
 
         self.plant_life = 30
-        self.ammonia_ramp_limit = ammonia_ramp_limit
-        self.ammonia_plant_turndown_ratio = ammonia_plant_turndown_ratio
-        self.dynamic_load = dynamic_load
+        self.rl = ammonia_ramp_limit
+        self.td = ammonia_plant_turndown_ratio
 
         self.LCOA_dict = {}
         self.main_dict = {}
+
+        self.HB_sizing = "fraction"
+
+    def re_init(self):
+        pass
 
     def run_HOPP(self):
         dir_path = Path(__file__).parents[1]
@@ -93,6 +96,7 @@ class RunDL:
         self.P2EL, self.P2ASU, self.P2HB = np.atleast_2d(
             self.energypkg
         ).T @ np.atleast_2d(self.hybrid_generation)
+        self.P_gen = self.P2ASU + self.P2HB
 
     def calc_H2_gen(self):
         H2_gen = np.zeros(len(self.P2EL))
@@ -102,10 +106,36 @@ class RunDL:
 
         self.H2_gen = H2_gen
 
-    def calc_steady_storage(self, SS: SteadyStorage, siteinfo):
-        SS.run(siteinfo)
+    def calc_demand_profile(self):
+        if self.HB_sizing == "mean":
+            center = np.mean(self.H2_gen)
+            max_demand = 2 / (1 + self.td)
+            min_demand = self.td * max_demand
+        elif self.HB_sizing == "linear interp":
+            center = (
+                np.mean(self.H2_gen) - np.max(self.H2_gen) / 2
+            ) * self.td + np.max(self.H2_gen) / 2
+            max_demand = 2 / (1 + self.td)
+            min_demand = self.td * max_demand
+        elif self.HB_sizing == "fraction":
+            A = np.array([[1, -np.max(self.H2_gen)], [1, -np.mean(self.H2_gen)]])
+            b = np.array([0, np.mean(self.H2_gen)])
+            coeffs = np.linalg.inv(A) @ b
+            max_demand = coeffs[0] / (self.td + coeffs[1])
+            min_demand = self.td * coeffs[0] / (self.td + coeffs[1])
 
-        self.H2_storage = SS
+        ramp_lim = self.rl * max_demand
+
+        self.DO = DemandOptimization(self.H2_gen, ramp_lim, min_demand, max_demand)
+        x, success, res = self.DO.optimize()
+        if success:
+            N = len(self.H2_gen)
+            H2_demand = x[0:N]
+            H2_storage_state = x[N : 2 * N]
+            H2_capacity = x[-2] - x[-1]
+            return H2_demand, H2_storage_state, H2_capacity
+        else:
+            print("Optimization failed")
 
     def calc_DL_storage(self, DA: DynamicAmmoniaStorage, siteinfo):
         # DA.calc_storage()
@@ -232,8 +262,8 @@ class RunDL:
                 "P_ASU_max": np.max(self.powers[:, 1]),
                 "NH3_max": np.max(self.chemicals[:, 2]),
                 "P_HB_max": np.max(self.powers[:, 2]),
-                "ramp_lim": self.ammonia_ramp_limit,
-                "plant_min": self.ammonia_plant_turndown_ratio,
+                "ramp_lim": self.rl,
+                "plant_min": self.td,
                 "LCOA_pipe": self.LCOA_pipe,
                 "LCOA_lined": self.LCOA_lined,
                 "LCOA_salt": self.LCOA_salt,
@@ -249,10 +279,10 @@ class RunDL:
         self.main_dict.update(self.LCOA_dict)
 
     def run(self, ramp_lim=None, plant_min=None):
-        if not (plant_min == None):
-            self.ammonia_plant_turndown_ratio = plant_min
-        if not (ramp_lim == None):
-            self.ammonia_ramp_limit = ramp_lim
+        if not (plant_min is None):
+            self.td = plant_min
+        if not (ramp_lim is None):
+            self.rl = ramp_lim
 
         # 2. inputs and outputs paths
         # 3. run HOPP
@@ -277,19 +307,27 @@ class RunDL:
         # 7. calculate hydrogen storage
         # 8. calculate electricity storage
 
-        if self.dynamic_load:
-            DA = DynamicAmmoniaStorage(
-                self.H2_gen,
-                self.P2EL,
-                self.P2ASU + self.P2HB,
-                ramp_lim=self.ammonia_ramp_limit,
-                plant_min=self.ammonia_plant_turndown_ratio,
-            )
-            self.calc_DL_storage(DA, self.hi.system.site)
+        (
+            self.H2_demand,
+            self.H2_storage_state,
+            self.H2_capacity,
+        ) = self.calc_demand_profile()
+        (
+            self.P_demand,
+            self.P_storage_state,
+            self.P_capacity,
+        ) = self.DO.calc_proportional_demand(self.H2_gen, self.P_gen)
 
-        else:
-            SS = SteadyStorage(self.H2_gen, self.P2EL, self.P2ASU + self.P2HB)
-            self.calc_steady_storage(SS, self.hi.system.site)
+        DA = DynamicAmmoniaStorage(
+            self.H2_gen,
+            self.H2_demand,
+            self.P_demand,
+            self.P2EL,
+            self.P2ASU + self.P2HB,
+            rl=self.rl,
+            td=self.td,
+        )
+        self.calc_DL_storage(DA, self.hi.system.site)
 
         self.battery = self.H2_storage.battery
 
@@ -317,6 +355,9 @@ class RunDL:
 
         []
 
+    def run_sweep(self, cases):
+        pass
+
 
 def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
     """Generate the ramp limits and turndown ratios for an analysis sweep
@@ -331,7 +372,11 @@ def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
     TD_ratios: array of turndown ratios to simulate
     """
 
-    if analysis == "simple":
+    if analysis == "testing":
+        ramp_lims = [0.5]
+        turndowns = [0.5]
+
+    elif analysis == "simple":
         # 5 cases
 
         ramp_lims = [1, 0.01, 0.99, 0]
