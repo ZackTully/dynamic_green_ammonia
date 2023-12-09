@@ -19,8 +19,8 @@ for hopp_input in hopp_inputs:
         ammonia_plant_turndown_ratio=0.1,
     )
 
-    # analysis_type = "full_sweep"
-    analysis_type = "simple"
+    analysis_type = "full_sweep"
+    # analysis_type = "simple"
 
     ramp_lims, turndowns = FlexibilityParameters(analysis=analysis_type)
     # ramp_lims, turndowns = FlexibilityParameters(
@@ -29,15 +29,17 @@ for hopp_input in hopp_inputs:
 
     dfs = []
 
+    n_runs = len(ramp_lims) * len(turndowns) * len(hopp_inputs)
+
     t_prev = t0
     for i, rl in enumerate(ramp_lims):
         for j, pm in enumerate(turndowns):
             DL.run(ramp_lim=rl, plant_min=pm)
             print(
-                f"Completed {count} out of {len(ramp_lims)*len(turndowns)*len(hopp_inputs)}. Ramp rate: {rl:.3f}, turndown: {pm:.3f}"
+                f"Completed {count} out of {n_runs}. Ramp rate: {rl:.3f}, turndown: {pm:.3f}"
             )
             print(
-                f"Took {time.time() - t_prev:.2f} seconds, maybe {(time.time() - t0) / (count/(len(ramp_lims)*len(turndowns)*len(hopp_inputs))):.2f} more seconds"
+                f"Took {time.time() - t_prev:.2f} seconds, maybe {( (time.time() - t0) * (n_runs / count) - (time.time() - t0)):.2f} more seconds"
             )
 
             t_prev = time.time()
@@ -49,4 +51,4 @@ for hopp_input in hopp_inputs:
         f"dynamic_green_ammonia/data/DL_runs/{analysis_type}_main_df_{hopp_input.split('.')[0][-2:]}.csv"
     )
 
-    print(f"Sweep took {time.time() - t0:.2f} seconds")
+    print(f"{hopp_input.split('.')[0][-2:]} sweep took {time.time() - t0:.2f} seconds")

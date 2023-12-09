@@ -14,6 +14,8 @@ import pandas as pd
 from multiprocess import Pool  # type: ignore
 import time
 from typing import Union
+import pprint
+
 
 from hopp.simulation import HoppInterface
 from hopp.simulation.technologies.wind.wind_plant import WindPlant
@@ -25,7 +27,6 @@ from dynamic_green_ammonia.technologies.chemical import (
     Electrolzyer,
 )
 from dynamic_green_ammonia.technologies.storage import (
-    SteadyStorage,
     DynamicAmmoniaStorage,
 )
 from dynamic_green_ammonia.technologies.demand import DemandOptimization
@@ -39,7 +40,7 @@ class RunDL:
     ASU: AirSeparationUnit
     HB: HaberBosch
     battery: Battery
-    storage: Union[SteadyStorage, DynamicAmmoniaStorage]
+    storage: DynamicAmmoniaStorage
 
     hybrid_generation: np.ndarray
     # site: HOPP SITE
@@ -61,22 +62,66 @@ class RunDL:
 
         self.HB_sizing = "fraction"
 
-    def re_init(self):
-        pass
+    def re_init(self, hopp_input=None, ramp_lim=None, turndown=None):
+        self.LCOA_dict = {}
+        self.main_dict = {}
 
-    def run_HOPP(self):
+        if ((self.hopp_input != hopp_input) & (hopp_input is not None)) or (
+            not hasattr(self, "hi")
+        ):
+            self.hi, self.hybrid_generation = self.run_HOPP(self.hopp_input)
+
+        dt = 3600  # [s]
+        rating = 1e9
+
+        self.EL = Electrolzyer(dt, rating)
+        self.ASU = AirSeparationUnit(dt, rating)
+        self.HB = HaberBosch(dt, rating)
+
+    def run_HOPP(self, hopp_input):
         dir_path = Path(__file__).parents[1]
 
-        self.hi = HoppInterface(dir_path / self.hopp_input)
-        self.hi.simulate(self.plant_life)
+        hi = HoppInterface(dir_path / hopp_input)
+        hi.simulate(self.plant_life)
 
-        self.wind = self.hi.system.wind
-        self.pv = self.hi.system.pv
+        self.wind = hi.system.wind
+        self.pv = hi.system.pv
 
         simulation_length = 8760
         wind_generation = np.array(self.wind.generation_profile[0:simulation_length])
         solar_generation = np.array(self.pv.generation_profile[0:simulation_length])
-        self.hybrid_generation = wind_generation + solar_generation
+        hybrid_generation = wind_generation + solar_generation
+
+        return hi, hybrid_generation
+
+    def write_hopp_main_dict(self):
+        self.main_dict.update(
+            {
+                "HOPP": {
+                    "wind": {
+                        "capex": self.hi.system.wind.cost_installed,
+                        "opex": np.sum(self.hi.system.wind.om_total_expense),
+                        "rating_kw": self.hi.system.wind.system_capacity_kw,
+                        "annual_energy": self.hi.system.wind.annual_energy_kwh,
+                        "CF": self.hi.system.wind.capacity_factor,
+                        "LCOE": self.hi.system.wind.levelized_cost_of_energy_real,
+                    },
+                    "pv": {
+                        "capex": self.hi.system.pv.cost_installed,
+                        "opex": np.sum(self.hi.system.pv.om_total_expense),
+                        "rating_kw": self.hi.system.pv.system_capacity_kw,
+                        "annual_energy": self.hi.system.pv.annual_energy_kwh,
+                        "CF": self.hi.system.pv.capacity_factor,
+                        "LCOE": self.hi.system.pv.levelized_cost_of_energy_real,
+                    },
+                    "site": {
+                        "lat": self.hi.system.site.lat,
+                        "lon": self.hi.system.site.lon,
+                        "year": self.hi.system.site.year,
+                    },
+                }
+            }
+        )
 
     def split_power(self):
         # energy per kg NH3 from each component
@@ -93,18 +138,39 @@ class RunDL:
         )
         self.energypkg /= np.sum(self.energypkg)
 
-        self.P2EL, self.P2ASU, self.P2HB = np.atleast_2d(
-            self.energypkg
-        ).T @ np.atleast_2d(self.hybrid_generation)
-        self.P_gen = self.P2ASU + self.P2HB
+        P2EL, P2ASU, P2HB = np.atleast_2d(self.energypkg).T @ np.atleast_2d(
+            self.hybrid_generation
+        )
+
+        return P2EL, P2ASU, P2HB
 
     def calc_H2_gen(self):
         H2_gen = np.zeros(len(self.P2EL))
+        reject = np.zeros(len(self.P2EL))
 
         for i in range(len(self.P2EL)):
-            H2_gen[i], reject = self.EL.step(self.P2EL[i])
+            H2_gen[i], reject[i] = self.EL.step(self.P2EL[i])
 
-        self.H2_gen = H2_gen
+        if np.sum(reject) > (1e-2 * np.sum(self.P2EL)):
+            print(
+                f"Electrolyzer rejected {np.sum(reject) / np.sum(self.P2EL) * 100:.2f} % of power"
+            )
+
+        self.main_dict.update(
+            {
+                "Electrolyzer": {
+                    "H2_gen_max": np.max(H2_gen),
+                    "H2_gen_tot": np.sum(H2_gen),
+                    "Conv kWh/kg": np.sum(self.P2EL) / np.sum(H2_gen),
+                    "mean_gen": np.mean(H2_gen),
+                    "max_gen": np.max(H2_gen),
+                }
+            }
+        )
+
+        # TODO check how this H2 generation compares with the HOPP electrolyzer
+
+        return H2_gen
 
     def calc_demand_profile(self):
         if self.HB_sizing == "mean":
@@ -132,35 +198,117 @@ class RunDL:
             N = len(self.H2_gen)
             H2_demand = x[0:N]
             H2_storage_state = x[N : 2 * N]
+            H2_state_initial = x[N]
             H2_capacity = x[-2] - x[-1]
-            return H2_demand, H2_storage_state, H2_capacity
+
+            self.main_dict.update(
+                {
+                    "H2 Storage": {
+                        # "capacity_kg": H2_capacity,
+                        "initial_state_kg": H2_state_initial,
+                        "min_demand": min_demand,
+                        "max_demand": max_demand,
+                        "HB_sizing": self.HB_sizing,
+                    }
+                }
+            )
+
+            return H2_demand, H2_storage_state, H2_state_initial, H2_capacity
         else:
             print("Optimization failed")
 
-    def calc_DL_storage(self, DA: DynamicAmmoniaStorage, siteinfo):
-        # DA.calc_storage()
-        DA.run(siteinfo)
+    def calc_DL_storage(self, siteinfo):
+        DA = DynamicAmmoniaStorage(
+            self.H2_gen,
+            self.H2_demand,
+            self.P_demand,
+            self.P2EL,
+            self.P2ASU + self.P2HB,
+        )
+
+        # TODO correct the last input self.P2ASU + self.P2HB to be the power to the ammonia synthesis, not just the proportional to H2 values
+
+        DA.calc_storage_requirements()
+        DA.calc_downstream_signals()
+        DA.calc_H2_financials()
+        DA.calc_electrolysis_financials()
+        DA.calc_battery_financials(siteinfo)
 
         self.P2ASU, self.P2HB = np.atleast_2d(
             self.energypkg[1:] / np.sum(self.energypkg[1:])
         ).T @ np.atleast_2d(DA.P_out)
-
         self.H2_storage_out = DA.H2_out
 
         self.H2_storage = DA
 
+        self.main_dict.update(
+            {
+                "H2_storage": {
+                    "capacity_kg": DA.H2_capacity_kg,
+                    "max_chg_kgphr": np.max(DA.H2_chg),
+                    "min_chg_kgphr": np.min(DA.H2_chg),
+                    "financials": {
+                        "pipe_capex": DA.pipe_capex,
+                        "pipe_opex": DA.pipe_opex,
+                        "lined_capex": DA.lined_capex,
+                        "lined_opex": DA.lined_opex,
+                        "salt_capex": DA.salt_capex,
+                        "salt_opex": DA.salt_opex,
+                    },
+                },
+                "Battery_storage": {
+                    "capacity_kWh": DA.P_capacity,
+                    "max_chg_kW": np.max(DA.P_chg),
+                    "min_chg_kWr": np.min(DA.P_chg),
+                    "financials": {
+                        "battery_capex": DA.battery_capex,
+                        "battery_opex": np.sum(DA.battery_opex),
+                    },
+                },
+                "Electrolyzer": {
+                    "HOPP_EL": {
+                        "EL_capex": DA.EL_capex,
+                        "EL_opex": DA.EL_opex,
+                        "max_production": DA.H2_results[
+                            "max_hydrogen_production [kg/hr]"
+                        ],
+                        "H2_annual_output": DA.H2_results["hydrogen_annual_output"],
+                        "CF": DA.H2_results["cap_factor"],
+                    },
+                },
+            }
+        )
+
     def calc_chemicals(self):
         powers = np.zeros([len(self.P2EL), 3])
         chemicals = np.zeros([len(self.P2EL), 3])
-        signals = np.zeros([len(self.P2EL), 3])
+        ASU_rejects = np.zeros([len(self.P2EL)])
+        HB_rejects = np.zeros([len(self.P2EL), 3])
 
         for i in range(len(self.P2EL)):
             # H2, EL_reject = EL.step(P2EL[i])
-            N2, ASU_reject = self.ASU.step(self.P2ASU[i])
-            NH3, HB_reject = self.HB.step(self.H2_storage_out[i], N2, self.P2HB[i])
+            N2, ASU_rejects[i] = self.ASU.step(self.P2ASU[i])
+            NH3, HB_rejects[i, :] = self.HB.step(
+                self.H2_storage_out[i], N2, self.P2HB[i]
+            )
 
             powers[i, :] = [self.P2EL[i], self.P2ASU[i], self.P2HB[i]]
             chemicals[i, :] = [self.H2_storage_out[i], N2, NH3]
+
+        if np.sum(ASU_rejects) > (1e-2 * np.sum(self.P2ASU)):
+            print(
+                f"ASU rejected {np.sum(ASU_rejects) / np.sum(self.P2EL) * 100:.2f} % of power"
+            )
+
+        if (
+            np.sum(HB_rejects, axis=0)
+            > 1e-2
+            * np.sum(
+                np.stack([self.H2_storage_out, chemicals[:, 1], self.P2HB], axis=1),
+                axis=0,
+            )
+        ).any():
+            print(f"HB rejected some of its intputs")
 
         H2_tot, N2_tot, NH3_tot = np.sum(chemicals, axis=0)
         H2_max, N2_max, NH3_max = np.max(chemicals, axis=0)
@@ -173,7 +321,44 @@ class RunDL:
         self.chemicals = chemicals
         self.powers = powers
 
+        self.main_dict.update(
+            {
+                "DGA": {
+                    "EL": {
+                        "H2_tot": H2_tot,
+                        "H2_max": H2_max,
+                        "P_EL_max": P_EL_max,
+                        "rating_elec": self.EL.rating_elec,
+                        "rating_H2": self.EL.rating_h2,
+                        "capex_rated_power": self.EL.capex_rated_power,
+                        "opex_rated_power": self.EL.opex_rated_power,  # per year
+                        "capex_kgpday": self.EL.capex_kgpday,
+                        "opex_kgpday": self.EL.opex_kgpday,  # per year
+                    },
+                    "ASU": {
+                        "N2_tot": N2_tot,
+                        "N2_max": N2_max,
+                        "P_ASU_max": P_ASU_max,
+                        "rating_elec": self.ASU.rating_elec,
+                        "rating_NH3": self.ASU.rating_N2,
+                        "capex": self.ASU.capex,
+                        "opex": self.ASU.opex,  # per year
+                    },
+                    "HB": {
+                        "NH3_tot": NH3_tot,
+                        "NH3_max": NH3_max,
+                        "P_HB_max": P_HB_max,
+                        "rating_elec": self.HB.rating_elec,
+                        "rating_NH3": self.HB.rating_NH3,
+                        "capex": self.HB.capex,
+                        "opex": self.HB.opex,  # per year
+                    },
+                }
+            }
+        )
+
     def calc_LCOA(self):
+        self.build_LCOA_dict()
         pipe_blacklist = [
             "lined_capex",
             "lined_opex",
@@ -278,31 +463,25 @@ class RunDL:
         )
         self.main_dict.update(self.LCOA_dict)
 
+
     def run(self, ramp_lim=None, plant_min=None):
         if not (plant_min is None):
             self.td = plant_min
         if not (ramp_lim is None):
             self.rl = ramp_lim
 
+        self.re_init()
+        self.write_hopp_main_dict()
+
         # 2. inputs and outputs paths
         # 3. run HOPP
         # 4. collect generation data
-
-        if not hasattr(self, "hi"):
-            self.run_HOPP()
-
         # 5. split power
-        dt = 3600  # [s]
-        rating = 1e9
-
-        self.EL = Electrolzyer(dt, rating)
-        self.ASU = AirSeparationUnit(dt, rating)
-        self.HB = HaberBosch(dt, rating)
-
-        self.split_power()
+        self.P2EL, self.P2ASU, self.P2HB = self.split_power()
+        self.P_gen = self.P2ASU + self.P2HB
 
         # 6 calculate hydrogen generation
-        self.calc_H2_gen()
+        self.H2_gen = self.calc_H2_gen()
 
         # 7. calculate hydrogen storage
         # 8. calculate electricity storage
@@ -310,6 +489,7 @@ class RunDL:
         (
             self.H2_demand,
             self.H2_storage_state,
+            self.H2_state_initial,
             self.H2_capacity,
         ) = self.calc_demand_profile()
         (
@@ -318,16 +498,7 @@ class RunDL:
             self.P_capacity,
         ) = self.DO.calc_proportional_demand(self.H2_gen, self.P_gen)
 
-        DA = DynamicAmmoniaStorage(
-            self.H2_gen,
-            self.H2_demand,
-            self.P_demand,
-            self.P2EL,
-            self.P2ASU + self.P2HB,
-            rl=self.rl,
-            td=self.td,
-        )
-        self.calc_DL_storage(DA, self.hi.system.site)
+        self.calc_DL_storage(self.hi.system.site)
 
         self.battery = self.H2_storage.battery
 
@@ -346,12 +517,17 @@ class RunDL:
         # 10. calculate storage costs
         # 11. calculate ammonia costs
         self.LT_NH3 = self.totals[2] * 1e-3 * self.plant_life  # [t]
-        self.build_LCOA_dict()
         self.calc_LCOA()
-        self.build_main_dict()
+        # self.build_main_dict()
         # should be about 771 USD/t NH3 (Cesaro 2021)
 
-        self.main_df = pd.DataFrame(self.main_dict, index=[0])
+        # self.main_df = self.build_outputs()
+
+        # self.main_df = pd.DataFrame(self.main_dict, index=[0])
+
+        # multikeys, values =  build_multiindex(self.main_dict)
+
+        self.main_df = build_multiindex_df(self.main_dict)
 
         []
 
@@ -362,12 +538,12 @@ class RunDL:
 def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
     """Generate the ramp limits and turndown ratios for an analysis sweep
 
-    inputs:
+    Args:
     analysis: either "simple" or "full sweep" which type of analysis the user is performing
     n_ramps: number of ramp limits to return
     n_tds: number of turndown ratios to return
 
-    returns:
+    Returns:
     ramp_lims: array of ramp_limits to simulate
     TD_ratios: array of turndown ratios to simulate
     """
@@ -396,3 +572,40 @@ def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
         #     turndowns = [0.25]
 
     return ramp_lims, turndowns
+
+
+def max_depth(d):
+    if isinstance(d, dict):
+        return 1 + max((max_depth(value) for value in d.values()), default=0)
+    return 0
+
+
+def build_multiindex(d):
+    if isinstance(d, dict):
+        ind_names = []
+        ind_values = []
+        for key in d.keys():
+            index_names, index_values = build_multiindex(d[key])
+            if index_names is None:
+                ind_names.append((key,))
+                ind_values.append(d[key])
+            else:
+                for i in range(len(index_names)):
+                    index_names[i] = (key,) + index_names[i]
+
+                ind_names.extend(index_names)
+                ind_values.extend(index_values)
+
+    else:
+        return None, [d]
+
+    return ind_names, ind_values
+
+
+def build_multiindex_df(d):
+    multikeys, values = build_multiindex(d)
+
+    mi = pd.MultiIndex.from_tuples(multikeys)
+    df = pd.DataFrame(data=[values], columns=mi)
+
+    return df

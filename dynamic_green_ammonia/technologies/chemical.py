@@ -33,7 +33,6 @@ class Electrolzyer:
         self.rating_elec = rating_elec
         self.rating_h2 = rating_h2
 
-
         rating_h2 = rating_h2 * 24
 
         self.K_rated_power = 880
@@ -44,8 +43,8 @@ class Electrolzyer:
         self.capex_rated_power = self.K_rated_power * rating_elec**self.n_rated_power
         self.opex_rated_power = 0.05 * self.capex_rated_power  # per year
 
-        self.capex_kgpdy = self.K_kgpday * rating_h2**self.n_kgpday
-        self.opex_kfpday = 0.05 * self.capex_kgpdy
+        self.capex_kgpday = self.K_kgpday * rating_h2**self.n_kgpday
+        self.opex_kgpday = 0.05 * self.capex_kgpday
 
     def calc_financials_hopp(self):
         pass
@@ -106,7 +105,6 @@ class HaberBosch:
         return NH3, reject
 
     def calc_financials(self, rating_elec, rating_kg_phr):
-
         self.rating_elec = rating_elec
         self.rating_NH3 = rating_kg_phr
 
@@ -144,4 +142,3 @@ class AirSeparationUnit:
 
         self.capex = self.K * rating_ton_pday**self.n
         self.opex = 0.05 * self.capex
-
