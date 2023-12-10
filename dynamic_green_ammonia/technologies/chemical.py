@@ -46,8 +46,6 @@ class Electrolzyer:
         self.capex_kgpday = self.K_kgpday * rating_h2**self.n_kgpday
         self.opex_kgpday = 0.05 * self.capex_kgpday
 
-    def calc_financials_hopp(self):
-        pass
 
 
 class HaberBosch:

@@ -6,6 +6,8 @@ from matplotlib.patches import Rectangle
 import pandas as pd
 from pathlib import Path
 
+
+
 # %% Load style sheet
 
 style = "paper"
@@ -19,13 +21,16 @@ elif style == "pres":
 
 location = "IN"
 
+
 data_path = Path(__file__).parents[1] / "data" / "DL_runs"
 save_path = Path(__file__).parents[1] / "plots"
 
-main_df_IN = pd.read_csv(data_path / "full_sweep_main_df_IN.csv")
+main_df_IN = pd.read_csv(data_path / "full_sweep_main_df_IN.csv", header=[0,1,2])
 main_df_TX = pd.read_csv(data_path / "full_sweep_main_df_TX.csv")
 
 # capacities = np.load("dynamic_green_ammonia/technologies/demand_opt_capacities.npy")
+
+
 
 if location == "IN":
     main_df = main_df_IN
@@ -33,11 +38,15 @@ elif location == "TX":
     main_df = main_df_TX
 
 
+#%%
+
 ramp_lims = np.unique(main_df["ramp_lim"].to_numpy())
 turndowns = np.unique(main_df["plant_min"].to_numpy())
 
 rl_realistic = 0.2
 td_realistic = 0.6
+
+# %%
 
 # %% Plotting helper methods
 

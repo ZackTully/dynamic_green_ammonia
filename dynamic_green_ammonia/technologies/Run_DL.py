@@ -331,9 +331,9 @@ class RunDL:
                         "rating_elec": self.EL.rating_elec,
                         "rating_H2": self.EL.rating_h2,
                         "capex_rated_power": self.EL.capex_rated_power,
-                        "opex_rated_power": self.EL.opex_rated_power,  # per year
+                        "opex_rated_power": self.EL.opex_rated_power * self.plant_life,
                         "capex_kgpday": self.EL.capex_kgpday,
-                        "opex_kgpday": self.EL.opex_kgpday,  # per year
+                        "opex_kgpday": self.EL.opex_kgpday * self.plant_life,
                     },
                     "ASU": {
                         "N2_tot": N2_tot,
@@ -342,7 +342,7 @@ class RunDL:
                         "rating_elec": self.ASU.rating_elec,
                         "rating_NH3": self.ASU.rating_N2,
                         "capex": self.ASU.capex,
-                        "opex": self.ASU.opex,  # per year
+                        "opex": self.ASU.opex * self.plant_life,
                     },
                     "HB": {
                         "NH3_tot": NH3_tot,
@@ -351,118 +351,103 @@ class RunDL:
                         "rating_elec": self.HB.rating_elec,
                         "rating_NH3": self.HB.rating_NH3,
                         "capex": self.HB.capex,
-                        "opex": self.HB.opex,  # per year
+                        "opex": self.HB.opex * self.plant_life,
                     },
                 }
             }
         )
 
-    def calc_LCOA(self):
-        self.build_LCOA_dict()
-        pipe_blacklist = [
-            "lined_capex",
-            "lined_opex",
-            "salt_capex",
-            "salt_opex",
-            "LT_NH3",
-        ]
-        lined_blacklist = [
-            "pipe_capex",
-            "pipe_opex",
-            "salt_capex",
-            "salt_opex",
-            "LT_NH3",
-        ]
-        salt_blacklist = [
-            "lined_capex",
-            "lined_opex",
-            "pipe_capex",
-            "pipe_opex",
-            "LT_NH3",
-        ]
+    # def calc_LCOA(self):
+    #     self.build_LCOA_dict()
+    #     pipe_blacklist = [
+    #         "lined_capex",
+    #         "lined_opex",
+    #         "salt_capex",
+    #         "salt_opex",
+    #         "LT_NH3",
+    #     ]
+    #     lined_blacklist = [
+    #         "pipe_capex",
+    #         "pipe_opex",
+    #         "salt_capex",
+    #         "salt_opex",
+    #         "LT_NH3",
+    #     ]
+    #     salt_blacklist = [
+    #         "lined_capex",
+    #         "lined_opex",
+    #         "pipe_capex",
+    #         "pipe_opex",
+    #         "LT_NH3",
+    #     ]
 
-        C_pipe = np.sum(
-            [
-                value
-                for key, value in self.LCOA_dict.items()
-                if key not in pipe_blacklist
-            ]
-        )
-        C_lined = np.sum(
-            [
-                value
-                for key, value in self.LCOA_dict.items()
-                if key not in lined_blacklist
-            ]
-        )
-        C_salt = np.sum(
-            [
-                value
-                for key, value in self.LCOA_dict.items()
-                if key not in salt_blacklist
-            ]
-        )
+    #     C_pipe = np.sum(
+    #         [
+    #             value
+    #             for key, value in self.LCOA_dict.items()
+    #             if key not in pipe_blacklist
+    #         ]
+    #     )
+    #     C_lined = np.sum(
+    #         [
+    #             value
+    #             for key, value in self.LCOA_dict.items()
+    #             if key not in lined_blacklist
+    #         ]
+    #     )
+    #     C_salt = np.sum(
+    #         [
+    #             value
+    #             for key, value in self.LCOA_dict.items()
+    #             if key not in salt_blacklist
+    #         ]
+    #     )
 
-        self.LCOA_pipe = C_pipe / self.LCOA_dict["LT_NH3"]
-        self.LCOA_lined = C_lined / self.LCOA_dict["LT_NH3"]
-        self.LCOA_salt = C_salt / self.LCOA_dict["LT_NH3"]
+    #     self.LCOA_pipe = C_pipe / self.LCOA_dict["LT_NH3"]
+    #     self.LCOA_lined = C_lined / self.LCOA_dict["LT_NH3"]
+    #     self.LCOA_salt = C_salt / self.LCOA_dict["LT_NH3"]
 
-    def build_LCOA_dict(self):
-        self.LCOA_dict.update(
-            {
-                "wind_capex": self.wind.cost_installed,
-                "wind_opex": np.sum(self.wind.om_total_expense),
-                "pv_capex": self.pv.cost_installed,
-                "pv_opex": np.sum(self.pv.om_total_expense),
-                "pipe_capex": self.H2_storage.pipe_capex,
-                "pipe_opex": self.H2_storage.pipe_opex,
-                "lined_capex": self.H2_storage.lined_capex,
-                "lined_opex": self.H2_storage.lined_opex,
-                "salt_capex": self.H2_storage.salt_capex,
-                "salt_opex": self.H2_storage.salt_opex,
-                "EL_capex": self.H2_storage.EL_capex,
-                "EL_opex": self.H2_storage.EL_opex,
-                "battery_capex": self.H2_storage.battery_capex,
-                "battery_opex": np.sum(self.H2_storage.battery_opex),
-                "ASU_capex": self.ASU.capex,
-                "ASU_opex": self.ASU.opex * self.plant_life,
-                "HB_capex": self.HB.capex,
-                "HB_opex": self.HB.opex * self.plant_life,
-                "LT_NH3": self.LT_NH3,
-            }
-        )
+    # def build_LCOA_dict(self):
+    #     self.LCOA_dict.update(
+    #         {
+    #             # "wind_capex": self.wind.cost_installed,
+    #             # "wind_opex": np.sum(self.wind.om_total_expense),
+    #             # "pv_capex": self.pv.cost_installed,
+    #             # "pv_opex": np.sum(self.pv.om_total_expense),
+    #             # "pipe_capex": self.H2_storage.pipe_capex,
+    #             # "pipe_opex": self.H2_storage.pipe_opex,
+    #             # "lined_capex": self.H2_storage.lined_capex,
+    #             # "lined_opex": self.H2_storage.lined_opex,
+    #             # "salt_capex": self.H2_storage.salt_capex,
+    #             # "salt_opex": self.H2_storage.salt_opex,
+    #             # "EL_capex": self.H2_storage.EL_capex,
+    #             # "EL_opex": self.H2_storage.EL_opex,
+    #             # "battery_capex": self.H2_storage.battery_capex,
+    #             # "battery_opex": np.sum(self.H2_storage.battery_opex),
+    #             # "ASU_capex": self.ASU.capex,
+    #             # "ASU_opex": self.ASU.opex * self.plant_life,
+    #             # "HB_capex": self.HB.capex,
+    #             # "HB_opex": self.HB.opex * self.plant_life,
+    #             # "LT_NH3": self.LT_NH3,
+    #         }
+    #     )
 
-    def build_main_dict(self):
-        self.main_dict.update(
-            {
-                "storage_capacity_kg": self.H2_storage.H2_capacity_kg,
-                "storage_flow_rate_kgphr": self.H2_storage.H2_chg_capacity,
-                "storage_soc_f": self.H2_storage.H2_soc[-1],
-                "plant_life": self.plant_life,
-                "P_max_EL": np.max(self.P2EL),
-                "H2_gen_max": np.max(self.H2_gen),
-                "H2_max": np.max(self.chemicals[:, 0]),
-                "P_EL_max": np.max(self.powers[:, 0]),
-                "N2_max": np.max(self.chemicals[:, 1]),
-                "P_ASU_max": np.max(self.powers[:, 1]),
-                "NH3_max": np.max(self.chemicals[:, 2]),
-                "P_HB_max": np.max(self.powers[:, 2]),
-                "ramp_lim": self.rl,
-                "plant_min": self.td,
-                "LCOA_pipe": self.LCOA_pipe,
-                "LCOA_lined": self.LCOA_lined,
-                "LCOA_salt": self.LCOA_salt,
-                "wind_rating": self.wind.system_capacity_kw,
-                "pv_rating": self.pv.system_capacity_kw,
-                "EL_rating": self.EL.rating_elec,
-                "H2_storage_rating": self.H2_storage.H2_capacity_kg,
-                "battery_rating": self.H2_storage.P_capacity,
-                "ASU_rating": self.ASU.rating_elec,
-                "HB_rating": self.HB.rating_elec,
-            }
-        )
-        self.main_dict.update(self.LCOA_dict)
-
+    # def build_main_dict(self):
+    #     self.main_dict.update(
+    #         {
+    #             "run_params": {
+    #                 "ramp_lim": self.rl,
+    #                 "turndown": self.td,
+    #                 "plant_life": self.plant_life,
+    #             },
+    #             # "storage_soc_f": self.H2_storage.H2_soc[-1],
+    #             # "H2_gen_max": np.max(self.H2_gen),
+    #             "LCOA_pipe": self.LCOA_pipe,
+    #             "LCOA_lined": self.LCOA_lined,
+    #             "LCOA_salt": self.LCOA_salt,
+    #             "LT_NH3": self.LT_NH3,
+    #         }
+    #     )
 
     def run(self, ramp_lim=None, plant_min=None):
         if not (plant_min is None):
@@ -517,15 +502,17 @@ class RunDL:
         # 10. calculate storage costs
         # 11. calculate ammonia costs
         self.LT_NH3 = self.totals[2] * 1e-3 * self.plant_life  # [t]
-        self.calc_LCOA()
-        # self.build_main_dict()
-        # should be about 771 USD/t NH3 (Cesaro 2021)
 
-        # self.main_df = self.build_outputs()
-
-        # self.main_df = pd.DataFrame(self.main_dict, index=[0])
-
-        # multikeys, values =  build_multiindex(self.main_dict)
+        self.main_dict.update(
+            {
+                "run_params": {
+                    "ramp_lim": self.rl,
+                    "turndown": self.td,
+                    "plant_life": self.plant_life,
+                },
+                "LT_NH3": self.LT_NH3,
+            }
+        )
 
         self.main_df = build_multiindex_df(self.main_dict)
 
@@ -561,15 +548,6 @@ def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
     elif analysis == "full_sweep":
         ramp_lims = np.concatenate([[0], np.logspace(-6, 0, 7)])
         turndowns = np.linspace(0, 1, 8)
-        # if n_ramps > 1:
-        #     ramp_lims = np.exp(np.linspace(np.log(0.01), np.log(1), n_ramps))
-        # else:
-        #     ramp_lims = [0.1]
-
-        # if n_tds > 1:
-        #     turndowns = 1 - np.logspace(np.log10(0.99), -2, n_tds)
-        # else:
-        #     turndowns = [0.25]
 
     return ramp_lims, turndowns
 
@@ -592,13 +570,10 @@ def build_multiindex(d):
             else:
                 for i in range(len(index_names)):
                     index_names[i] = (key,) + index_names[i]
-
                 ind_names.extend(index_names)
                 ind_values.extend(index_values)
-
     else:
         return None, [d]
-
     return ind_names, ind_values
 
 
