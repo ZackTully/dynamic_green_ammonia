@@ -83,6 +83,25 @@ PEM_cost = PEM_costs_Singlitico_model.PEMCostsSingliticoModel(0)
 PEM_capex, PEM_opex = PEM_cost.run(electrolyzer_size_mw * 1e-3, 600)
 plt.plot(H2_timeseries["hydrogen_hourly_production"])
 
-# %%
+# %% Compare costs
 
-plt.show()
+
+print(f"HOPP EL capex: {PEM_capex:.2f}, HOPP EL opex: {PEM_opex:.2f}")
+print(f'kgpday EL capex: {DL.main_dict["DGA"]["EL"]["capex_kgpday"]:.2f}, kgpday EL opex: {DL.main_dict["DGA"]["EL"]["opex_kgpday"]:.2f}')
+print(f'kgpday EL capex: {DL.main_dict["DGA"]["EL"]["capex_rated_power"]:.2f}, kgpday EL opex: {DL.main_dict["DGA"]["EL"]["opex_rated_power"]:.2f}')
+
+
+#%%
+
+capex_p = lambda p_rated: 880 * p_rated ** 1
+capex_h2 = lambda h2_rated: 1 * h2_rated ** 0.65
+   
+p = np.linspace(0, 1e6, 100) # 0 kW to 1 gW rated power
+h2 = p / 53.5 * 24 # kW / (kWh / kg)
+
+
+plt.plot(p, capex_p(p))
+plt.plot(p, capex_h2(h2) )
+
+
+# %%

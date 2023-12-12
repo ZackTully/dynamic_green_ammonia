@@ -290,22 +290,22 @@ c = lambda TD: a * TD**2 + b*TD + g_bar/2
 # d_min = lambda TD: (2 / (1 + 1 / TD)) * c(TD)
 # d_max = lambda TD: (2 / (1 + TD)) * c(TD)
 
-A = np.array([
-    [0, 0, 1],
-    [1, 1, 1],
-    [3, 2, 1]
-])
+# A = np.array([
+#     [0, 0, 1],
+#     [1, 1, 1],
+#     [3, 2, 1]
+# ])
 
-b = np.array([g_bar, mu, 0])
+# b = np.array([g_bar, mu, 0])
 
-coeffs = np.linalg.inv(A)@b
+# coeffs = np.linalg.inv(A)@b
 
-a = coeffs[0]
-b = coeffs[1]
-c = coeffs[2]
+# a = coeffs[0]
+# b = coeffs[1]
+# c = coeffs[2]
 
-d_max = lambda TD: a * TD**2 + b * TD + c
-d_min = lambda TD: a * TD**3 + b * TD**2 + c*TD
+# d_max = lambda TD: a * TD**2 + b * TD + c
+# d_min = lambda TD: a * TD**3 + b * TD**2 + c*TD
 
 
 A = np.array([[1, -g_bar], [1, -mu]])

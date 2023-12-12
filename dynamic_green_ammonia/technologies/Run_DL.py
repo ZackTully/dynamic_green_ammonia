@@ -61,6 +61,7 @@ class RunDL:
         self.main_dict = {}
 
         self.HB_sizing = "fraction"
+        self.x0 = None
 
     def re_init(self, hopp_input=None, ramp_lim=None, turndown=None):
         self.LCOA_dict = {}
@@ -91,6 +92,8 @@ class RunDL:
         wind_generation = np.array(self.wind.generation_profile[0:simulation_length])
         solar_generation = np.array(self.pv.generation_profile[0:simulation_length])
         hybrid_generation = wind_generation + solar_generation
+
+        # hybrid_generation = np.roll(hybrid_generation, shift=1519)
 
         return hi, hybrid_generation
 
@@ -192,7 +195,7 @@ class RunDL:
 
         ramp_lim = self.rl * max_demand
 
-        self.DO = DemandOptimization(self.H2_gen, ramp_lim, min_demand, max_demand)
+        self.DO = DemandOptimization(self.H2_gen, ramp_lim, min_demand, max_demand, self.x0)
         x, success, res = self.DO.optimize()
         if success:
             N = len(self.H2_gen)
@@ -200,15 +203,18 @@ class RunDL:
             H2_storage_state = x[N : 2 * N]
             H2_state_initial = x[N]
             H2_capacity = x[-2] - x[-1]
+            self.x0 = x
+
 
             self.main_dict.update(
                 {
-                    "H2 Storage": {
+                    "H2_storage": {
                         # "capacity_kg": H2_capacity,
                         "initial_state_kg": H2_state_initial,
                         "min_demand": min_demand,
                         "max_demand": max_demand,
                         "HB_sizing": self.HB_sizing,
+                        "min_state_index": np.argmin(H2_storage_state),
                     }
                 }
             )
@@ -243,19 +249,6 @@ class RunDL:
 
         self.main_dict.update(
             {
-                "H2_storage": {
-                    "capacity_kg": DA.H2_capacity_kg,
-                    "max_chg_kgphr": np.max(DA.H2_chg),
-                    "min_chg_kgphr": np.min(DA.H2_chg),
-                    "financials": {
-                        "pipe_capex": DA.pipe_capex,
-                        "pipe_opex": DA.pipe_opex,
-                        "lined_capex": DA.lined_capex,
-                        "lined_opex": DA.lined_opex,
-                        "salt_capex": DA.salt_capex,
-                        "salt_opex": DA.salt_opex,
-                    },
-                },
                 "Battery_storage": {
                     "capacity_kWh": DA.P_capacity,
                     "max_chg_kW": np.max(DA.P_chg),
@@ -277,6 +270,21 @@ class RunDL:
                     },
                 },
             }
+        )
+        self.main_dict["H2_storage"].update(
+            {
+                "capacity_kg": DA.H2_capacity_kg,
+                "max_chg_kgphr": np.max(DA.H2_chg),
+                "min_chg_kgphr": np.min(DA.H2_chg),
+                "financials": {
+                    "pipe_capex": DA.pipe_capex,
+                    "pipe_opex": DA.pipe_opex,
+                    "lined_capex": DA.lined_capex,
+                    "lined_opex": DA.lined_opex,
+                    "salt_capex": DA.salt_capex,
+                    "salt_opex": DA.salt_opex,
+                },
+            },
         )
 
     def calc_chemicals(self):
@@ -357,98 +365,6 @@ class RunDL:
             }
         )
 
-    # def calc_LCOA(self):
-    #     self.build_LCOA_dict()
-    #     pipe_blacklist = [
-    #         "lined_capex",
-    #         "lined_opex",
-    #         "salt_capex",
-    #         "salt_opex",
-    #         "LT_NH3",
-    #     ]
-    #     lined_blacklist = [
-    #         "pipe_capex",
-    #         "pipe_opex",
-    #         "salt_capex",
-    #         "salt_opex",
-    #         "LT_NH3",
-    #     ]
-    #     salt_blacklist = [
-    #         "lined_capex",
-    #         "lined_opex",
-    #         "pipe_capex",
-    #         "pipe_opex",
-    #         "LT_NH3",
-    #     ]
-
-    #     C_pipe = np.sum(
-    #         [
-    #             value
-    #             for key, value in self.LCOA_dict.items()
-    #             if key not in pipe_blacklist
-    #         ]
-    #     )
-    #     C_lined = np.sum(
-    #         [
-    #             value
-    #             for key, value in self.LCOA_dict.items()
-    #             if key not in lined_blacklist
-    #         ]
-    #     )
-    #     C_salt = np.sum(
-    #         [
-    #             value
-    #             for key, value in self.LCOA_dict.items()
-    #             if key not in salt_blacklist
-    #         ]
-    #     )
-
-    #     self.LCOA_pipe = C_pipe / self.LCOA_dict["LT_NH3"]
-    #     self.LCOA_lined = C_lined / self.LCOA_dict["LT_NH3"]
-    #     self.LCOA_salt = C_salt / self.LCOA_dict["LT_NH3"]
-
-    # def build_LCOA_dict(self):
-    #     self.LCOA_dict.update(
-    #         {
-    #             # "wind_capex": self.wind.cost_installed,
-    #             # "wind_opex": np.sum(self.wind.om_total_expense),
-    #             # "pv_capex": self.pv.cost_installed,
-    #             # "pv_opex": np.sum(self.pv.om_total_expense),
-    #             # "pipe_capex": self.H2_storage.pipe_capex,
-    #             # "pipe_opex": self.H2_storage.pipe_opex,
-    #             # "lined_capex": self.H2_storage.lined_capex,
-    #             # "lined_opex": self.H2_storage.lined_opex,
-    #             # "salt_capex": self.H2_storage.salt_capex,
-    #             # "salt_opex": self.H2_storage.salt_opex,
-    #             # "EL_capex": self.H2_storage.EL_capex,
-    #             # "EL_opex": self.H2_storage.EL_opex,
-    #             # "battery_capex": self.H2_storage.battery_capex,
-    #             # "battery_opex": np.sum(self.H2_storage.battery_opex),
-    #             # "ASU_capex": self.ASU.capex,
-    #             # "ASU_opex": self.ASU.opex * self.plant_life,
-    #             # "HB_capex": self.HB.capex,
-    #             # "HB_opex": self.HB.opex * self.plant_life,
-    #             # "LT_NH3": self.LT_NH3,
-    #         }
-    #     )
-
-    # def build_main_dict(self):
-    #     self.main_dict.update(
-    #         {
-    #             "run_params": {
-    #                 "ramp_lim": self.rl,
-    #                 "turndown": self.td,
-    #                 "plant_life": self.plant_life,
-    #             },
-    #             # "storage_soc_f": self.H2_storage.H2_soc[-1],
-    #             # "H2_gen_max": np.max(self.H2_gen),
-    #             "LCOA_pipe": self.LCOA_pipe,
-    #             "LCOA_lined": self.LCOA_lined,
-    #             "LCOA_salt": self.LCOA_salt,
-    #             "LT_NH3": self.LT_NH3,
-    #         }
-    #     )
-
     def run(self, ramp_lim=None, plant_min=None):
         if not (plant_min is None):
             self.td = plant_min
@@ -514,7 +430,8 @@ class RunDL:
             }
         )
 
-        self.main_df = build_multiindex_df(self.main_dict)
+        multi_df, flat_df = build_multiindex_df(self.main_dict)
+        self.main_df = flat_df
 
         []
 
@@ -542,8 +459,8 @@ def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
     elif analysis == "simple":
         # 5 cases
 
-        ramp_lims = [1, 0.01, 0.99, 0]
-        turndowns = [0, 0.01, 0.99, 1]
+        ramp_lims = [1, 0.5, 0]
+        turndowns = [0, 0.5, 1]
 
     elif analysis == "full_sweep":
         ramp_lims = np.concatenate([[0], np.logspace(-6, 0, 7)])
@@ -561,26 +478,31 @@ def max_depth(d):
 def build_multiindex(d):
     if isinstance(d, dict):
         ind_names = []
+        fl_names = []
         ind_values = []
         for key in d.keys():
-            index_names, index_values = build_multiindex(d[key])
+            index_names, flat_names, index_values = build_multiindex(d[key])
             if index_names is None:
+                fl_names.append(key)
                 ind_names.append((key,))
                 ind_values.append(d[key])
             else:
                 for i in range(len(index_names)):
                     index_names[i] = (key,) + index_names[i]
+                    flat_names[i] = ".".join([key, flat_names[i]])
                 ind_names.extend(index_names)
+                fl_names.extend(flat_names)
                 ind_values.extend(index_values)
     else:
-        return None, [d]
-    return ind_names, ind_values
+        return None, None, [d]
+    return ind_names, fl_names, ind_values
 
 
 def build_multiindex_df(d):
-    multikeys, values = build_multiindex(d)
+    multikeys, flat_keys, values = build_multiindex(d)
 
     mi = pd.MultiIndex.from_tuples(multikeys)
-    df = pd.DataFrame(data=[values], columns=mi)
+    mi_df = pd.DataFrame(data=[values], columns=mi)
+    flat_df = pd.DataFrame(data=[values], columns=flat_keys)
 
-    return df
+    return mi_df, flat_df

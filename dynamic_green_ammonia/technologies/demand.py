@@ -3,13 +3,14 @@ from scipy.optimize import linprog
 
 
 class DemandOptimization:
-    def __init__(self, H2_gen, ramp_lim, min_demand, max_demand):
+    def __init__(self, H2_gen, ramp_lim, min_demand, max_demand, x0=None):
         self.optimization_version = 2
         self.H2_gen = H2_gen
         self.N = len(self.H2_gen)  # number of time steps in optimization
         self.ramp_lim = ramp_lim
         self.min_demand = min_demand
         self.max_demand = max_demand
+        self.x0 = x0
 
     def optimize(self):
         if self.min_demand >= self.max_demand:
@@ -204,14 +205,26 @@ class DemandOptimization:
 
         bounds = [(bound_l[i], bound_u[i]) for i, bl in enumerate(bound_l)]
 
-        res = linprog(
-            c=C,
-            A_ub=A_ub,
-            b_ub=b_ub,
-            A_eq=A_eq,
-            b_eq=b_eq,
-            bounds=bounds,
-        )
+
+        if self.x0 is not None:
+            res = linprog(
+                c=C,
+                A_ub=A_ub,
+                b_ub=b_ub,
+                A_eq=A_eq,
+                b_eq=b_eq,
+                bounds=bounds,
+                x0=self.x0
+            )
+        else: 
+            res = linprog(
+                c=C,
+                A_ub=A_ub,
+                b_ub=b_ub,
+                A_eq=A_eq,
+                b_eq=b_eq,
+                bounds=bounds,
+            )
 
         return res.x, res.success, res
 

@@ -19,8 +19,8 @@ for hopp_input in hopp_inputs:
         ammonia_plant_turndown_ratio=0.1,
     )
 
-    analysis_type = "testing"
-    # analysis_type = "full_sweep"
+    # analysis_type = "testing"
+    analysis_type = "full_sweep"
     # analysis_type = "simple"
 
     ramp_lims, turndowns = FlexibilityParameters(analysis=analysis_type)
