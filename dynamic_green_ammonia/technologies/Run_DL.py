@@ -62,6 +62,7 @@ class RunDL:
 
         self.HB_sizing = "fraction"
         self.x0 = None
+        self.storage_state_zeros = []
 
     def re_init(self, hopp_input=None, ramp_lim=None, turndown=None):
         self.LCOA_dict = {}
@@ -93,7 +94,7 @@ class RunDL:
         solar_generation = np.array(self.pv.generation_profile[0:simulation_length])
         hybrid_generation = wind_generation + solar_generation
 
-        # hybrid_generation = np.roll(hybrid_generation, shift=1519)
+        # hybrid_generation = np.roll(hybrid_generation, shift=-1519)
 
         return hi, hybrid_generation
 
@@ -195,16 +196,22 @@ class RunDL:
 
         ramp_lim = self.rl * max_demand
 
-        self.DO = DemandOptimization(self.H2_gen, ramp_lim, min_demand, max_demand, self.x0)
+        self.DO = DemandOptimization(
+            self.H2_gen, ramp_lim, min_demand, max_demand, self.x0
+        )
         x, success, res = self.DO.optimize()
         if success:
+            self.x0 = x
+
             N = len(self.H2_gen)
             H2_demand = x[0:N]
             H2_storage_state = x[N : 2 * N]
             H2_state_initial = x[N]
             H2_capacity = x[-2] - x[-1]
-            self.x0 = x
 
+            zero_inds = np.zeros(len(self.H2_gen))
+            zero_inds[np.where(H2_storage_state == 0)] = 1
+            self.storage_state_zeros.append(zero_inds)
 
             self.main_dict.update(
                 {
@@ -222,6 +229,15 @@ class RunDL:
             return H2_demand, H2_storage_state, H2_state_initial, H2_capacity
         else:
             print("Optimization failed")
+
+    def plot_MA(self, ma_width, signal):
+        fig, ax = plt.subplots(2, 1)
+
+        ax[0].plot(signal)
+
+        ret = np.cumsum(signal)
+        ret[ma_width:] = ret[ma_width:] - ret[:-ma_width]
+        ax[1].plot(ret)
 
     def calc_DL_storage(self, siteinfo):
         DA = DynamicAmmoniaStorage(
@@ -322,7 +338,7 @@ class RunDL:
         H2_max, N2_max, NH3_max = np.max(chemicals, axis=0)
         P_EL_max, P_ASU_max, P_HB_max = np.max(powers, axis=0)
 
-        self.EL.calc_financials(P_EL_max, H2_max)
+        self.EL.calc_financials(P_EL_max, np.max(self.H2_gen))
         self.ASU.calc_financials(P_ASU_max, N2_max)
         self.HB.calc_financials(P_HB_max, NH3_max)
         self.totals = [H2_tot, N2_tot, NH3_tot]
@@ -439,7 +455,7 @@ class RunDL:
         pass
 
 
-def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
+def FlexibilityParameters(analysis="simple", n_ramps=8, n_tds=8):
     """Generate the ramp limits and turndown ratios for an analysis sweep
 
     Args:
@@ -463,8 +479,8 @@ def FlexibilityParameters(analysis="simple", n_ramps=1, n_tds=1):
         turndowns = [0, 0.5, 1]
 
     elif analysis == "full_sweep":
-        ramp_lims = np.concatenate([[0], np.logspace(-6, 0, 7)])
-        turndowns = np.linspace(0, 1, 8)
+        ramp_lims = np.concatenate([[0], np.logspace(-6, 0, n_ramps - 1)])
+        turndowns = np.linspace(0, 1, n_tds)
 
     return ramp_lims, turndowns
 

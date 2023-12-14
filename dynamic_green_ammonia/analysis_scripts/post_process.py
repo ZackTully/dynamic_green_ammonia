@@ -21,20 +21,21 @@ elif style == "pres":
 location = "IN"
 analysis_type = "full_sweep"
 
-data_path = Path(__file__).parents[1] / "data" / "notable_runs" / "january_start"
-# data_path = Path(__file__).parents[1] / "data" / "DL_runs" 
+# data_path = Path(__file__).parents[1] / "data" / "notable_runs" / "march-3_start"
+# data_path = Path(__file__).parents[1] / "data" / "notable_runs" / "january_start"
+data_path = Path(__file__).parents[1] / "data" / "DL_runs" 
 save_path = Path(__file__).parents[1] / "plots"
-
-main_df_IN = pd.read_csv(data_path / f"{analysis_type}_main_df_IN.csv")
-main_df_TX = pd.read_csv(data_path / f"{analysis_type}_main_df_TX.csv")
 
 # capacities = np.load("dynamic_green_ammonia/technologies/demand_opt_capacities.npy")
 
-
 if location == "IN":
+    main_df_IN = pd.read_csv(data_path / f"{analysis_type}_main_df_IN.csv")
     main_df = main_df_IN
 elif location == "TX":
+
+    main_df_TX = pd.read_csv(data_path / f"{analysis_type}_main_df_TX.csv")
     main_df = main_df_TX
+
 
 
 # %%
@@ -109,9 +110,8 @@ def plot_bars(ax, x, df, tech):
 
 def get_3d_things(ramp_lims, turndowns, data_name):
     # flip ramp lims and turndowns here so that I don't have to flip anything later
-
-    rl_fake = np.linspace(0, 1, len(ramp_lims))
-    td_fake = np.linspace(0, 1, len(turndowns))
+    rl_fake = np.linspace(1, 0, len(ramp_lims))
+    td_fake = np.linspace(1, 0, len(turndowns))
     RL, TD = np.meshgrid(rl_fake, td_fake)
     data_surface = np.zeros(np.shape(RL))
     for i in range(np.shape(RL)[0]):
@@ -124,7 +124,7 @@ def get_3d_things(ramp_lims, turndowns, data_name):
 
 
 def plot_surface(fig, ax, data_name, RL=None, TD=None, data=None):
-    if type(data_name) == str:
+    if isinstance(data_name, str):
         RL, TD, data = get_3d_things(ramp_lims, turndowns, data_name)
     else:
         data_name = ""
@@ -132,7 +132,7 @@ def plot_surface(fig, ax, data_name, RL=None, TD=None, data=None):
     surf = ax.plot_surface(RL, TD, data, cmap=cm.plasma)
     cbar = fig.colorbar(surf, shrink=0.5, aspect=7)
 
-    ax.set_xticks(RL[0, :], ramp_lims)
+    ax.set_xticks(RL[0, :], np.flip(ramp_lims))
     ax.set_yticks(turndowns, np.round(turndowns, 2))
     ax.set_zticklabels([])
     ax.set_xlabel("ramp limit")
@@ -140,11 +140,13 @@ def plot_surface(fig, ax, data_name, RL=None, TD=None, data=None):
     # ax.invert_yaxis()
     # ax.invert_xaxis()
     cbar.set_label(data_name)
-    ax.view_init(elev=35, azim=135, roll=0)
+    ax.view_init(elev=35, azim=-45, roll=0)
+    # ax.view_init(elev=90, azim=0, roll=0)
+
 
 
 def plot_heat(fig, ax, data_name, RL=None, TD=None, data=None):
-    if type(data_name) == str:
+    if isinstance(data_name, str):
         RL, TD, data = get_3d_things(ramp_lims, turndowns, data_name)
     else:
         data_name = ""
@@ -164,19 +166,21 @@ def plot_heat(fig, ax, data_name, RL=None, TD=None, data=None):
 
 
     rect_kwargs = {"alpha": 0.5, "facecolor": "white"}
-    rect1 = Rectangle([0, 0], rl_real_loc, 1, **rect_kwargs)
-    rect2 = Rectangle(
-        [rl_real_loc, 1 - td_realistic], 1 - rl_real_loc, td_realistic, **rect_kwargs
-    )
+    # rect1 = Rectangle([0, 0], rl_real_loc, 1, **rect_kwargs)
+    # rect2 = Rectangle(
+    #     [rl_real_loc, 1 - td_realistic], 1 - rl_real_loc, td_realistic, **rect_kwargs
+    # )
+    rect1 = Rectangle([0,0], 1-rl_real_loc, td_realistic, **rect_kwargs)
+    rect2 = Rectangle([1-rl_real_loc, 0], rl_real_loc, 1, **rect_kwargs)
     ax.add_patch(rect1)
     ax.add_patch(rect2)
 
-    ax.plot([rl_real_loc, rl_real_loc], [0, 1 - td_realistic], color="black")
-    ax.plot([rl_real_loc, 1], [1 - td_realistic, 1 - td_realistic], color="black")
+    ax.plot([1-rl_real_loc, 1-rl_real_loc], [td_realistic, 1], color="black")
+    ax.plot([0, 1-rl_real_loc], [td_realistic, td_realistic], color="black")
     ax.clabel(CS1, CS1.levels, inline=True, colors="black")
     cbar = fig.colorbar(CSf)
     ax.set_xticks(RL[0, :], np.flip(ramp_lims))
-    ax.set_yticks(turndowns, np.flip(np.round(turndowns, 2)))
+    ax.set_yticks(turndowns, np.round(turndowns, 2))
     ax.invert_xaxis()
     # ax.invert_yaxis()
     ax.set_xlabel("ramp limit")
@@ -185,18 +189,26 @@ def plot_heat(fig, ax, data_name, RL=None, TD=None, data=None):
     cbar.set_label(data_name)
 
 
+def plot_lines(ax, column):
+    for rl in ramp_lims:
+        ax.plot(turndowns, main_df[main_df["run_params.ramp_lim"] == rl][column], color=cm.plasma(rl/ramp_lims[-1]))
+    ax.set_xlabel("tds")
+    ax.set_ylabel(column)
+
 def get_colors():
     pass
 
+#%%
 
-# %% Plot inititial state surface
+fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
+plot_surface(fig, ax, "H2_storage.capacity_kg")
+fig.savefig(save_path / f"Capacity_surface_{style}.png", format="png")
+fig.savefig(save_path / f"Capacity_surface_{style}.pdf", format="pdf")
 
 fig, ax = plt.subplots(1, 1)
 plot_heat(fig, ax, "H2_storage.capacity_kg")
 fig.savefig(save_path / f"Capacity_heat_{style}.png", format="png")
 fig.savefig(save_path / f"Capacity_heat_{style}.pdf", format="pdf")
-
-# %% Plot LCOA bars
 
 df_rl_constant = get_df_at_ramp_lim(main_df, 0.01)
 x = turndowns
@@ -218,24 +230,36 @@ fig.legend(handles[::-1], labels[::-1], loc="outside right")
 fig.savefig(save_path / f"LCOA_by_type_{style}.png", format="png")
 fig.savefig(save_path / f"LCOA_by_type_{style}.pdf", format="pdf")
 
-# %% Plot capacity surface and heatmap
+#%%
 
-
-fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
-plot_surface(fig, ax, "H2_storage.capacity_kg")
-fig.savefig(save_path / f"Capacity_surface_{style}.png", format="png")
-fig.savefig(save_path / f"Capacity_surface_{style}.pdf", format="pdf")
-
-fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
-plot_surface(fig, ax, "H2_storage.initial_state_kg")
+fig, ax = plt.subplots(1, 2, subplot_kw={"projection": "3d"}, figsize=(15, 5))
+plot_surface(fig, ax[0], "H2_storage.initial_state_kg")
+ax[0].set_title("Initial state [kg]")
 
 RL, TD, data_cap = get_3d_things(ramp_lims, turndowns, "H2_storage.capacity_kg")
 RL, TD, data_state = get_3d_things(ramp_lims, turndowns, "H2_storage.initial_state_kg")
 soc_data = data_state / data_cap
 
-fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
-plot_surface(fig, ax, None, RL=RL, TD=TD, data=soc_data)
-fig.suptitle("Initial SOC [kg]")
+# fig, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
+plot_surface(fig, ax[1], None, RL=RL, TD=TD, data=soc_data)
+ax[1].set_title("Initial SOC ")
+
+#%%
+
+fig, ax = plt.subplots(1,1,subplot_kw={"projection":"3d"})
+plot_surface(fig, ax, "H2_storage.min_state_index")
+
+#%% troubleshooting plots
+
+fig, ax = plt.subplots(2,2, sharex='col')
+
+plot_lines(ax[0,0], "LT_NH3")
+plot_lines(ax[0,1], "HOPP.wind.annual_energy")
+plot_lines(ax[1,0], "Electrolyzer.HOPP_EL.H2_annual_output")
+plot_lines(ax[1,1], "DGA.EL.H2_max")
+
+
+
 
 
 # %%
@@ -260,5 +284,3 @@ fig.suptitle("Storage duration based on max discharge [days]")
 
 #%%
 
-fig, ax = plt.subplots(1,1,subplot_kw={"projection":"3d"})
-plot_surface(fig, ax, "H2_storage.min_state_index")

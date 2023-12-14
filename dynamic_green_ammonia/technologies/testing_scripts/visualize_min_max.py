@@ -158,8 +158,8 @@ crossover = np.zeros(len(TDs))
 for i in range(len(TDs)):
     d_mins = np.zeros(len(mus))
     for j in range(len(mus)):
-        # d_mins[j] = d_ubar(TDs[i], mus[j])
-        d_mins[j] = get_d_min(TDs[i], mus[j])
+        d_mins[j] = d_ubar(TDs[i], mus[j])
+        # d_mins[j] = get_d_min(TDs[i], mus[j])
 
     cross_idx = np.argmin(np.abs((d_mins - mus)))
     crossover[i] = mus[cross_idx]
@@ -329,25 +329,52 @@ ax[1].plot(TDs, mu-d_min(TDs))
 
 #%%
 
-A = np.array([
-    [0, 0, 0, 1],
-    [1, 1, 1, 1],
-    [3, 2, 1, 0],
-    [4, 3, 2, 1]
-])
+def min_max(g_bar, mu, TD):
 
-b = np.array([g_bar, mu, 0, 0])
+    A = np.array([[1, -g_bar], [1, -mu]])
+    b = np.array([0, mu])
+    coeffs = np.linalg.inv(A) @ b
 
-np.linalg.inv(A)@b
+    a = coeffs[0]
+    b = coeffs[1]
 
-#%%
+    d_max = lambda TD: a / (TD + b)
+    d_min = lambda TD: TD * d_max(TD)
 
-A = np.array([
-    [0, 0, 1],
-    [1, 1, 1],
-    [3, 2, 1]
-])
+    return d_min(TD), d_max(TD)
 
-b = np.array([g_bar, mu, 0])
+g_bar = 1
+mu = np.linspace(0.01, .99, 5)
+TD = np.linspace(0, 1, 100)
 
-np.linalg.inv(A)@b
+fig, ax = plt.subplots(1,1)
+
+for i in range(len(mu)):
+    d_mi, d_ma = min_max(g_bar, mu[i], TD)
+    ax.plot(TD, d_mi, color=cm.plasma(i / len(mu)))
+    ax.plot(TD, d_ma, color=cm.plasma(i / len(mu)))
+
+
+def plot_bounds(g_bar, mu, ax):
+    ax.set_xlim([-.05, 1.05])
+    ax.hlines([g_bar, mu], -1, 2, linestyle="dashed", color='black', linewidth=.75, alpha=.5)
+    ax.plot([0, 1], [g_bar, mu], linestyle='dashed', color='black', linewidth=.75)
+    ax.plot([0, 1], [0, mu], linestyle='dashed', color='black', linewidth=.75)
+    ax.text( 0, mu, "mean generation")
+    ax.text(0, g_bar, "max generation")
+
+
+mus = [0.05, 0.2, 0.8, 0.95]
+fig, ax = plt.subplots(1, len(mus), sharex='row', sharey='row', figsize=(15, 5), dpi=400)
+
+
+
+for i in range(len(mus)):
+    plot_bounds(g_bar, mus[i], ax[i])
+    d_mi, d_ma = min_max(g_bar, mus[i], TD)
+    ax[i].plot(TD, d_mi)
+    ax[i].plot(TD, d_ma)
+    ax[i].set_xlabel("Turndown ratio")
+    
+ax[0].set_ylabel("Plant rating")
+

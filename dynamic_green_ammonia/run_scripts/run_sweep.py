@@ -23,7 +23,9 @@ for hopp_input in hopp_inputs:
     analysis_type = "full_sweep"
     # analysis_type = "simple"
 
-    ramp_lims, turndowns = FlexibilityParameters(analysis=analysis_type)
+    ramp_lims, turndowns = FlexibilityParameters(
+        analysis=analysis_type, n_ramps=8, n_tds=8
+    )
     # ramp_lims, turndowns = FlexibilityParameters(
     #     analysis=analysis_type, n_ramps=3, n_tds=10
     # )
@@ -46,6 +48,10 @@ for hopp_input in hopp_inputs:
             t_prev = time.time()
             dfs.append(DL.main_df.copy())
             count += 1
+
+    # import matplotlib.pyplot as plt
+    # for i, zeros in enumerate(DL.storage_state_zeros):
+    #     plt.plot(zeros+i)
 
     main_df = pd.concat(dfs)
     main_df.to_csv(
