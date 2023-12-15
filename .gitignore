@@ -111,3 +111,5 @@ ENV/
 # Project Stuff
 data/
 .log
+
+dynamic_green_ammonia/inputs/HOPP_sweep_inputs/
