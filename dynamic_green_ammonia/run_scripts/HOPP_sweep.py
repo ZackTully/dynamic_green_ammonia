@@ -52,7 +52,7 @@ if generate_HOPP_files:
     locations = [[34.22, -102.75], [41.62, -87.22]]
     # locations = [[34.22, -102.75]]
     hybrid_rating = 1e6  # [kW]
-    wind_pv_split = np.linspace(0.1, 0.9, 3)
+    wind_pv_split = np.linspace(0.01, 0.99, 10)
     # wind_pv_split = [0.5]
 
     base_file = open("dynamic_green_ammonia/inputs/BASEFILE_hopp_input.yaml", "r")
@@ -94,6 +94,11 @@ if run_HOPP:
     ramp_lims, turndowns = FlexibilityParameters(
         analysis="full_sweep", n_ramps=5, n_tds=5
     )
+
+    # 140 hopp cases
+
+    ramp_lims = [0.0001, 0.01, 0.2]
+    turndowns = [0.01, 0.6, 0.99]
 
     hopp_files = os.listdir("dynamic_green_ammonia/inputs/HOPP_sweep_inputs")
     generation_profiles = []
@@ -164,3 +169,5 @@ if run_HOPP:
 
     gen_profiles = np.stack(generation_profiles)
     np.save("dynamic_green_ammonia/data/HOPP_sweep/hopp_sweep_gen.npy", gen_profiles)
+
+    []
