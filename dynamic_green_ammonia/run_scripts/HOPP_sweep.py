@@ -9,6 +9,7 @@ import pandas as pd
 
 from dynamic_green_ammonia.technologies.Run_DL import RunDL, FlexibilityParameters
 
+
 generate_HOPP_files = True
 run_HOPP = True
 
@@ -47,13 +48,13 @@ if generate_HOPP_files:
 
     # generate HOPP input files for sweep
 
-    years = [2007, 2008, 2009, 2010, 2011, 2012, 2013]
-    # years = [2011, 2012]
+    # years = [2007, 2008, 2009, 2010, 2011, 2012, 2013]
+    years = [2012]
     locations = [[34.22, -102.75], [41.62, -87.22]]
     # locations = [[34.22, -102.75]]
     hybrid_rating = 1e6  # [kW]
-    wind_pv_split = np.linspace(0.01, 0.99, 10)
-    # wind_pv_split = [0.5]
+    # wind_pv_split = np.linspace(0.01, 0.99, 10)
+    wind_pv_split = [0.5]
 
     base_file = open("dynamic_green_ammonia/inputs/BASEFILE_hopp_input.yaml", "r")
     base_dict = yaml.load(base_file, yaml.Loader)
@@ -97,14 +98,31 @@ if run_HOPP:
 
     # 140 hopp cases
 
-    ramp_lims = [0.0001, 0.01, 0.2]
-    turndowns = [0.01, 0.6, 0.99]
+    # ramp_lims = np.array([1, 2, 4, 12, 87.6, 876, 2 * 876, 0.5 * 8760]) / 8760
+    # turndowns = np.linspace(0.1, 0.9, 5)
+    ramp_lims = [0.2]
+    turndowns = np.linspace(.05, .95, 19)
+
+    # Always include inflexible case and fully flexible case
+
+    rltd = []  # tuples of (rl, td)
+    rltd.append((0, 1))  # inflexible case
+
+    for rl in ramp_lims:
+        for td in turndowns:
+            rltd.append((rl, td))
+
+    rltd.append((1, 0))  # flexible case
 
     hopp_files = os.listdir("dynamic_green_ammonia/inputs/HOPP_sweep_inputs")
-    generation_profiles = []
+    H2_profiles = []
+    wind_profiles = []
+    solar_profiles = []
     save_df = []
+    dfs = []
 
     n_runs = len(hopp_files) * len(ramp_lims) * len(turndowns)
+    n_runs = len(hopp_files) * len(rltd)
 
     print(f"{n_runs} runs planned.")
 
@@ -129,45 +147,59 @@ if run_HOPP:
         DL.P_gen = DL.P2ASU + DL.P2HB
         DL.H2_gen = DL.calc_H2_gen()
 
-        generation_profiles.append(DL.H2_gen)
+        H2_profiles.append(DL.H2_gen)
+        wind_profiles.append(DL.wind.generation_profile[0:8760])
+        solar_profiles.append(DL.pv.generation_profile[0:8760])
 
-        for rl in ramp_lims:
-            for td in turndowns:
-                DL.rl = rl
-                DL.td = td
+        for flex_params in rltd:
+            rl = flex_params[0]
+            td = flex_params[1]
 
-                (
-                    DL.H2_demand,
-                    DL.H2_storage_state,
-                    DL.H2_state_initial,
-                    DL.H2_capacity,
-                ) = DL.calc_demand_profile()
+            # for rl in ramp_lims:
+            # for td in turndowns:
+            # DL.rl = rl
+            # DL.td = td
 
-                df_dict = {
-                    "year": year,
-                    "lat": lat,
-                    "lon": lon,
-                    "split": split,
-                    "rl": rl,
-                    "td": td,
-                    "gen_ind": i,
-                    "hopp_input": hopp_file,
-                    "storage_cap_kg": DL.H2_capacity,
-                    "storage_state": [DL.H2_storage_state],
-                }
+            # (
+            #     DL.H2_demand,
+            #     DL.H2_storage_state,
+            #     DL.H2_state_initial,
+            #     DL.H2_capacity,
+            # ) = DL.calc_demand_profile()
 
-                save_df.append(pd.DataFrame(df_dict))
+            DL.run(rl, td)
+            dfs.append(DL.main_df.copy())
 
-                message = f"{hopp_file}, ramp lim: {rl:.4f}, turndown: {td:.2f}"
-                prev = progress(start, prev, time.time(), count, n_runs, message)
-                count += 1
+            df_dict = {
+                "year": year,
+                "lat": lat,
+                "lon": lon,
+                "split": split,
+                "rl": rl,
+                "td": td,
+                "gen_ind": i,
+                "hopp_input": hopp_file,
+                "storage_cap_kg": DL.H2_capacity,
+                "storage_state": [DL.H2_storage_state],
+            }
 
-                []
+            save_df.append(pd.DataFrame(df_dict))
+
+            message = f"{hopp_file}, ramp lim: {rl:.4f}, turndown: {td:.2f}"
+            prev = progress(start, prev, time.time(), count, n_runs, message)
+            count += 1
 
     df = pd.concat(save_df)
     df.to_pickle(f"dynamic_green_ammonia/data/HOPP_sweep/hopp_sweep.pkl")
 
-    gen_profiles = np.stack(generation_profiles)
-    np.save("dynamic_green_ammonia/data/HOPP_sweep/hopp_sweep_gen.npy", gen_profiles)
+    main_df = pd.concat(dfs)
+    main_df.to_csv(f"dynamic_green_ammonia/data/DL_runs/full_sweep_main_df.csv")
+
+    H2_profiles = np.stack(H2_profiles)
+    wind_profiles = np.stack(wind_profiles)
+    solar_profiles = np.stack(solar_profiles)
+    np.save("dynamic_green_ammonia/data/HOPP_sweep/H2_gen.npy", H2_profiles)
+    np.save("dynamic_green_ammonia/data/HOPP_sweep/wind_gen.npy", wind_profiles)
+    np.save("dynamic_green_ammonia/data/HOPP_sweep/solar_gen.npy", solar_profiles)
 
     []

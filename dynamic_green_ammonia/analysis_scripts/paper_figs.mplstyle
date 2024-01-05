@@ -6,7 +6,7 @@ xtick.labelsize : 10
 ytick.labelsize : 10
 
 figure.dpi:300
-figure.figsize: [6.5, 5]
+
 
 # text.usetex : True
 

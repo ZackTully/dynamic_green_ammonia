@@ -1,0 +1,148 @@
+
+%%% Preamble Requirements %%%
+% \usepackage{geometry}
+% \usepackage{amsfonts}
+% \usepackage{amsmath}
+% \usepackage{amssymb}
+% \usepackage{tikz}
+
+% Optional packages such as sfmath set through python interface
+% \usepackage{sfmath}
+
+% \usetikzlibrary{arrows,chains,positioning,scopes,shapes.geometric,shapes.misc,shadows}
+
+%%% End Preamble Requirements %%%
+
+\input{"/opt/anaconda3/envs/HOPP_GS/lib/python3.8/site-packages/pyxdsm/diagram_styles"}
+\begin{tikzpicture}
+
+\matrix[MatrixSetup]{
+%Row 0
+&
+\node [Function] (wind) {$wind$};&
+&
+\node [DataInter] (wind-hybrid) {$P_wind$};&
+&
+&
+&
+&
+\\
+%Row 1
+&
+&
+\node [Function] (pv) {$pv$};&
+\node [DataInter] (pv-hybrid) {$P_pv$};&
+&
+&
+&
+&
+\\
+%Row 2
+&
+&
+&
+\node [Function] (hybrid) {$hybrid$};&
+\node [DataInter] (hybrid-EL) {$P_EL$};&
+\node [DataInter] (hybrid-HB) {$P_HB$};&
+\node [DataInter] (hybrid-ASU) {$P_ASU$};&
+\node [DataInter] (hybrid-Batt) {$P_batt$};&
+\\
+%Row 3
+&
+&
+&
+&
+\node [Function] (EL) {$EL$};&
+\node [DataInter] (EL-HB) {$H2$};&
+&
+&
+\node [DataInter] (EL-H2_st) {$H2$};\\
+%Row 4
+\node [DataIO] (left_output_HB) {$NH3$};&
+&
+&
+&
+&
+\node [Function] (HB) {$HB$};&
+&
+&
+\\
+%Row 5
+&
+&
+&
+&
+&
+\node [DataInter] (ASU-HB) {$N2$};&
+\node [Function] (ASU) {$ASU$};&
+&
+\\
+%Row 6
+&
+&
+&
+&
+\node [DataInter] (Batt-EL) {$P_EL$};&
+\node [DataInter] (Batt-HB) {$P_HB$};&
+\node [DataInter] (Batt-ASU) {$P_ASU$};&
+\node [Function] (Batt) {$Batt$};&
+\\
+%Row 7
+&
+&
+&
+&
+&
+\node [DataInter] (H2_st-HB) {$H2$};&
+&
+&
+\node [Function] (H2_st) {$H2 st$};\\
+%Row 8
+&
+&
+&
+&
+&
+&
+&
+&
+\\
+};
+
+% XDSM process chains
+
+
+\begin{pgfonlayer}{data}
+\path
+% Horizontal edges
+(wind) edge [DataLine] (wind-hybrid)
+(pv) edge [DataLine] (pv-hybrid)
+(hybrid) edge [DataLine] (hybrid-EL)
+(hybrid) edge [DataLine] (hybrid-ASU)
+(hybrid) edge [DataLine] (hybrid-HB)
+(hybrid) edge [DataLine] (hybrid-Batt)
+(Batt) edge [DataLine] (Batt-EL)
+(Batt) edge [DataLine] (Batt-ASU)
+(Batt) edge [DataLine] (Batt-HB)
+(ASU) edge [DataLine] (ASU-HB)
+(EL) edge [DataLine] (EL-HB)
+(EL) edge [DataLine] (EL-H2_st)
+(H2_st) edge [DataLine] (H2_st-HB)
+(HB) edge [DataLine] (left_output_HB)
+% Vertical edges
+(wind-hybrid) edge [DataLine] (hybrid)
+(pv-hybrid) edge [DataLine] (hybrid)
+(hybrid-EL) edge [DataLine] (EL)
+(hybrid-ASU) edge [DataLine] (ASU)
+(hybrid-HB) edge [DataLine] (HB)
+(hybrid-Batt) edge [DataLine] (Batt)
+(Batt-EL) edge [DataLine] (EL)
+(Batt-ASU) edge [DataLine] (ASU)
+(Batt-HB) edge [DataLine] (HB)
+(ASU-HB) edge [DataLine] (HB)
+(EL-HB) edge [DataLine] (HB)
+(EL-H2_st) edge [DataLine] (H2_st)
+(H2_st-HB) edge [DataLine] (HB);
+\end{pgfonlayer}
+
+\end{tikzpicture}
