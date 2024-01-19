@@ -2,8 +2,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm, ticker
 from matplotlib.lines import Line2D
+from pathlib import Path
 
-plt.rcParams["text.usetex"] = True
+style = "paper"
+
+if style == "paper":
+    plt.style.use(
+        Path(__file__).parents[2] / "analysis_scripts" / "paper_figs.mplstyle"
+    )
+elif style == "pres":
+    plt.style.use(Path(__file__).parent[2] / "analysis_scripts" / "pres_figs.mplstyle")
+
+# plt.rcParams["text.usetex"] = True
 
 from dynamic_green_ammonia.technologies.demand import DemandOptimization
 
@@ -12,7 +22,8 @@ H2_gen = H2_gen[0:250]
 N = len(H2_gen)
 time = np.linspace(0, N, N)
 
-fig, ax = plt.subplots(2, 2, sharex="all", sharey="all", figsize=(8, 6))
+# fig, ax = plt.subplots(2, 2, sharex="all", sharey="all", figsize=(8, 6))
+fig, ax = plt.subplots(2, 2, sharex="all", sharey="all", figsize=(7.2, 4))
 # fig2, ax2 = plt.subplots(2, 2, sharex="all", sharey="all", figsize=(8, 8))
 
 # RL = [0.0001, 0.0001, 0.5, 0.99]

@@ -16,6 +16,8 @@ if style == "paper":
 elif style == "pres":
     plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
 
+# plt.rcParams[""]
+
 # %% load data files
 
 location = "IN"
@@ -36,7 +38,7 @@ save_path = Path(__file__).parents[1] / "plots"
 #     main_df = main_df_TX
 
 
-df_all = pd.read_csv(data_path / "full_sweep_main_df.csv")
+df_all = pd.read_csv(data_path / "full_sweep_main_df_20231220.csv")
 lats = np.unique(df_all["HOPP.site.lat"])
 years = np.unique(df_all["HOPP.site.year"])
 if len(years) == 0:
@@ -252,27 +254,27 @@ plot_surface(fig, ax, "H2_storage.capacity_kg")
 
 fig, ax = plt.subplots(1, 1)
 plot_heat(fig, ax, "H2_storage.capacity_kg")
-# fig.savefig(save_path / f"Capacity_heat_{style}.png", format="png")
-# fig.savefig(save_path / f"Capacity_heat_{style}.pdf", format="pdf")
+fig.savefig(save_path / f"Capacity_heat_{style}.png", format="png")
+fig.savefig(save_path / f"Capacity_heat_{style}.pdf", format="pdf")
 
-df_rl_constant = get_df_at_ramp_lim(main_df, rl_realistic)
+# df_rl_constant = get_df_at_ramp_lim(main_df, rl_realistic)
+# # x = turndowns
 # x = turndowns
-x = turndowns
 
 
-fig, ax = plt.subplots(1, 3, sharex="row", sharey="row")
-fig.suptitle("LCOA breakdown")
-handles, labels = plot_bars(ax[0], x, df_rl_constant, "pipe")
-ax[0].set_ylabel("LCOA [USD/t]")
-ax[0].set_title("Pipe storage")
-ax[0].set_xlabel("Turndown Ratio")
-handles, labels = plot_bars(ax[1], x, df_rl_constant, "lined")
-ax[1].set_title("Lined cavern")
-ax[1].set_xlabel("Turndown Ratio")
-handles, labels = plot_bars(ax[2], x, df_rl_constant, "salt")
-ax[2].set_title("Salt cavern")
-ax[2].set_xlabel("Turndown Ratio")
-fig.legend(handles[::-1], labels[::-1], loc="outside right")
+# fig, ax = plt.subplots(1, 3, sharex="row", sharey="row")
+# fig.suptitle("LCOA breakdown")
+# handles, labels = plot_bars(ax[0], x, df_rl_constant, "pipe")
+# ax[0].set_ylabel("LCOA [USD/t]")
+# ax[0].set_title("Pipe storage")
+# ax[0].set_xlabel("Turndown Ratio")
+# handles, labels = plot_bars(ax[1], x, df_rl_constant, "lined")
+# ax[1].set_title("Lined cavern")
+# ax[1].set_xlabel("Turndown Ratio")
+# handles, labels = plot_bars(ax[2], x, df_rl_constant, "salt")
+# ax[2].set_title("Salt cavern")
+# ax[2].set_xlabel("Turndown Ratio")
+# fig.legend(handles[::-1], labels[::-1], loc="outside right")
 
 # fig.savefig(save_path / f"LCOA_by_type_{style}.png", format="png")
 # fig.savefig(save_path / f"LCOA_by_type_{style}.pdf", format="pdf")

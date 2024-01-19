@@ -6,9 +6,10 @@ xtick.labelsize : 10
 ytick.labelsize : 10
 
 figure.dpi:300
+figure.figsize: 3.5, 3.5
 
 
-# text.usetex : True
+text.usetex : True
 
 font.family: serif
 font.sans-serif: Computer Modern

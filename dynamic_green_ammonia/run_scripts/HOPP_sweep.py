@@ -10,6 +10,8 @@ import pandas as pd
 from dynamic_green_ammonia.technologies.Run_DL import RunDL, FlexibilityParameters
 
 
+save_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
+
 generate_HOPP_files = True
 run_HOPP = True
 
@@ -26,7 +28,7 @@ if generate_HOPP_files:
         except Exception as e:
             print("failed to delete %s. Reason: %s" % (file_path, e))
 
-    def update_dict(base_dict, year, loc, hybrid_rating, split):
+    def update_dict(base_dict, year, loc, elev, hybrid_rating, split):
         save_name = f"year{year}_lat{loc[0]}_lon{loc[1]}_split0p{split*100:.0f}"
 
         wind_rating = split * hybrid_rating
@@ -36,7 +38,9 @@ if generate_HOPP_files:
 
         save_dict = base_dict.copy()
         save_dict.update({"name": save_name})
-        save_dict["site"]["data"].update({"lat": loc[0], "lon": loc[1], "year": year})
+        save_dict["site"]["data"].update(
+            {"lat": loc[0], "lon": loc[1], "year": year, "elev": elev}
+        )
         save_dict["technologies"]["pv"].update({"system_capacity_kw": int(pv_rating)})
         save_dict["technologies"]["wind"].update(
             {
@@ -50,8 +54,24 @@ if generate_HOPP_files:
 
     # years = [2007, 2008, 2009, 2010, 2011, 2012, 2013]
     years = [2012]
-    locations = [[34.22, -102.75], [41.62, -87.22]]
-    # locations = [[34.22, -102.75]]
+    all_loc_names = ["IN", "TX", "IA", "MS", "WY", "MN", "GA"]
+    all_loc_coords = [
+        [41.62, -87.22],
+        [34.22, -102.75],
+        [42.55, -90.69],
+        [30.45, -89.35],
+        [42.00, -105.40],
+        [47.5233, -92.5366],
+        [33.45082, -85.2618],
+    ]
+    base_elev = 1099
+    all_elevations = [base_elev, 3800, 600, base_elev, base_elev, base_elev, base_elev]
+
+    loc_names = ["TX", "IA"]
+    # loc_names = ["IA"]
+    locations = [all_loc_coords[all_loc_names.index(ln)] for ln in loc_names]
+    elevations = [all_elevations[all_loc_names.index(ln)] for ln in loc_names]
+
     hybrid_rating = 1e6  # [kW]
     # wind_pv_split = np.linspace(0.01, 0.99, 10)
     wind_pv_split = [0.5]
@@ -60,10 +80,10 @@ if generate_HOPP_files:
     base_dict = yaml.load(base_file, yaml.Loader)
 
     for year in years:
-        for location in locations:
+        for i, location in enumerate(locations):
             for split in wind_pv_split:
                 save_dict, save_name = update_dict(
-                    base_dict, year, location, hybrid_rating, split
+                    base_dict, year, location, elevations[i], hybrid_rating, split
                 )
                 save_file = open(
                     "".join(
@@ -100,19 +120,28 @@ if run_HOPP:
 
     # ramp_lims = np.array([1, 2, 4, 12, 87.6, 876, 2 * 876, 0.5 * 8760]) / 8760
     # turndowns = np.linspace(0.1, 0.9, 5)
-    ramp_lims = [0.2]
-    turndowns = np.linspace(.05, .95, 19)
+
+    # flexibility parameters for LCOA pltos
+    # ramp_lims = [0.2]
+    # turndowns = np.linspace(0.05, 0.95, 19)
+
+    # flexibility parameters for heatmaps
+    # ramp_lims = [0.01, 0.1, 0.2, 0.5, 0.75]
+    ramp_lims = np.logspace(-2, -2 - (-2 - np.log10(0.2)) / 4 * 6, 7)
+    turndowns = np.linspace(0.1, 0.9, 9)
 
     # Always include inflexible case and fully flexible case
+    ramp_lims = np.concatenate([[0], ramp_lims, [1]])
+    turndowns = np.concatenate([[0], turndowns, [1]])
 
     rltd = []  # tuples of (rl, td)
-    rltd.append((0, 1))  # inflexible case
+    # rltd.append((0, 1))  # inflexible case
 
     for rl in ramp_lims:
         for td in turndowns:
             rltd.append((rl, td))
 
-    rltd.append((1, 0))  # flexible case
+    # rltd.append((1, 0))  # flexible case
 
     hopp_files = os.listdir("dynamic_green_ammonia/inputs/HOPP_sweep_inputs")
     H2_profiles = []
@@ -155,18 +184,6 @@ if run_HOPP:
             rl = flex_params[0]
             td = flex_params[1]
 
-            # for rl in ramp_lims:
-            # for td in turndowns:
-            # DL.rl = rl
-            # DL.td = td
-
-            # (
-            #     DL.H2_demand,
-            #     DL.H2_storage_state,
-            #     DL.H2_state_initial,
-            #     DL.H2_capacity,
-            # ) = DL.calc_demand_profile()
-
             DL.run(rl, td)
             dfs.append(DL.main_df.copy())
 
@@ -190,16 +207,16 @@ if run_HOPP:
             count += 1
 
     df = pd.concat(save_df)
-    df.to_pickle(f"dynamic_green_ammonia/data/HOPP_sweep/hopp_sweep.pkl")
+    df.to_pickle(save_path / "hopp_sweep.pkl")
 
     main_df = pd.concat(dfs)
-    main_df.to_csv(f"dynamic_green_ammonia/data/DL_runs/full_sweep_main_df.csv")
+    main_df.to_csv(save_path / "full_sweep_main_df.csv")
 
     H2_profiles = np.stack(H2_profiles)
     wind_profiles = np.stack(wind_profiles)
     solar_profiles = np.stack(solar_profiles)
-    np.save("dynamic_green_ammonia/data/HOPP_sweep/H2_gen.npy", H2_profiles)
-    np.save("dynamic_green_ammonia/data/HOPP_sweep/wind_gen.npy", wind_profiles)
-    np.save("dynamic_green_ammonia/data/HOPP_sweep/solar_gen.npy", solar_profiles)
+    np.save(save_path / "H2_gen.npy", H2_profiles)
+    np.save(save_path / "wind_gen.npy", wind_profiles)
+    np.save(save_path / "solar_gen.npy", solar_profiles)
 
     []
