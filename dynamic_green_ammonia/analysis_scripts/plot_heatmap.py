@@ -4,6 +4,7 @@ from matplotlib import cm
 from matplotlib.patches import Rectangle
 import pandas as pd
 from pathlib import Path
+import scipy
 
 style = "paper"
 
@@ -22,14 +23,15 @@ data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
 save_path = Path(__file__).parents[1] / "plots"
 
 df_all = pd.read_csv(data_path / "full_sweep_main_df.csv")
+
+# change storage units from kg to t
+df_all["H2_storage.capacity_kg"] = df_all["H2_storage.capacity_kg"] / 1e3
 lats = np.unique(df_all["HOPP.site.lat"])
 
 
 locations = ["TX", "IA"]
 
-figs = []
-axs = []
-cbars = []
+fig, ax = plt.subplots(1, 2, sharey="row", figsize=(7.2, 3.5))  # , dpi=150)
 
 for i, loc in enumerate(locations):
     main_df = df_all[df_all["HOPP.site.lat"] == lats[i]]
@@ -40,26 +42,18 @@ for i, loc in enumerate(locations):
     rl_realistic = 0.2
     td_realistic = 0.6
 
-    fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.5))
+    # fig, ax = plt.subplots(1, 1, figsize=(3.5, 2.5))
     data_name = "H2_storage.capacity_kg"
 
     f_R = ramp_lims
     f_T = 1 - turndowns
 
-    ax.plot([0, 0], [1, 1])
+    # ax.plot([0, 0], [1, 1])
 
-    ax.set_xlabel("Ramping flexibility $f_R$")
-    ax.set_ylabel("Turndown flexibility $f_T$")
+    ax[i].set_xlabel("Ramping flexibility $f_R$")
 
-    # f_R = ramp_lims
-    # f_T = 1 - turndowns
-
-    # rl_fake = np.log(np.linspace(np.exp(0), np.exp(1), len(ramp_lims)))
-    rl_fake = np.linspace(0, 1, len(ramp_lims))
-    # rl_fake = ramp_lims
-    # rl_fake = np.concatenate([[0], np.logspace(-1, 0, len(ramp_lims) - 1)])
-    # rl_logs = np.concatenate([1 - np.logspace(0, -1, 7), [1]])
-    # rl_fake = np.concatenate([1 - np.exp(-ramp_lims[:-1]), [1]])
+    # rl_fake = np.linspace(0, 1, len(ramp_lims))
+    rl_fake = np.concatenate([[0], np.linspace(0.1, 0.9, len(ramp_lims) - 2), [1]])
 
     b = (0.4 - 0.2**2) / (0.2 - 0.2**2)
     a = 1 - b
@@ -70,7 +64,7 @@ for i, loc in enumerate(locations):
     data = np.zeros([len(ramp_lims), len(turndowns)])
     RL = np.zeros(np.shape(data))
     TD = np.zeros(np.shape(data))
-    for i in range(len(ramp_lims)):
+    for k in range(len(ramp_lims)):
         for j in range(len(turndowns)):
             # if (ramp_lims[i] == 0) or (turndowns[j] == 1):  # inflexible case,
             #     data_point = main_df[
@@ -86,124 +80,182 @@ for i, loc in enumerate(locations):
                 pass
             else:
                 data_point = main_df[
-                    (main_df["run_params.ramp_lim"] == ramp_lims[i])
+                    (main_df["run_params.ramp_lim"] == ramp_lims[k])
                     & (main_df["run_params.turndown"] == turndowns[j])
                 ][data_name]
 
-            data[i, j] = data_point
-            RL[i, j] = rl_fake[i]
-            TD[i, j] = td_fake[j]
+            data[k, j] = data_point
+            RL[k, j] = rl_fake[k]
+            TD[k, j] = td_fake[j]
 
-    # data[-1, -1] = -np.max(data)
-    n_levels = 20
-    # levels = np.linspace(np.min(data), np.max(data), 20)
+    n_levels = 10
     levels = np.linspace(
         df_all["H2_storage.capacity_kg"].min(),
         df_all["H2_storage.capacity_kg"].max(),
         n_levels,
     )
 
-    # n_levels = 15
-    # curviness = 1
-    # interp_locs = np.log(np.linspace(np.exp(0), np.exp(curviness), n_levels)) / curviness
-    # levels = np.interp(interp_locs, [0, 1], [np.min(data), np.max(data)])
+    CS0 = ax[i].contourf(RL, TD, data, levels=levels, cmap=cm.plasma)
+    CS1 = ax[i].contour(RL, TD, data, levels=levels, cmap=cm.plasma, linewidths=0.25)
 
-    CS0 = ax.contourf(RL, TD, data, levels=levels, cmap=cm.plasma)
+    y_locs = np.interp(levels, data[-1, :], np.linspace(1, 0, len(turndowns)))
+    # y_locs = y_locs[np.where(levels <= np.max(data))[0]]
+    y_locs = y_locs[np.where(y_locs > 0)[0]]
+
+    x_locs = 0.85 * np.ones(len(y_locs))
+
+    manual_locations = np.stack([x_locs, y_locs])[:, 1:].T
+    clabels = ax[i].clabel(
+        CS1,
+        inline=True,
+        fontsize=10,
+        colors="black",
+        manual=manual_locations,
+    )
+
+    # for txt in clabels:
+    #     txt.set_bbox(
+    #         # {"facecolor": "white", "edgecolor": "white", "pad": 0, "alpha": 0.5}
+    #         {"color": "white", "pad": 0}
+    #     )
 
     rl_fake_realistic = np.interp(rl_realistic, ramp_lims, rl_fake)
 
     BAT_x = [0, rl_fake_realistic, rl_fake_realistic]
     BAT_y = [1 - td_realistic, 1 - td_realistic, 0]
+    BAT_cap = np.interp(
+        td_realistic,
+        turndowns,
+        [
+            np.interp(rl_realistic, ramp_lims, data[:, i])
+            for i in range(np.shape(data)[1])
+        ],
+    )
 
-    ax.plot(BAT_x, BAT_y, linestyle="dashed", color="black")
+    ax[i].plot(BAT_x, BAT_y, linestyle="dashed", color="black")
+    # ax[i].text(
+    #     rl_fake_realistic,
+    #     1 - td_realistic,
+    #     f"BAT:\n{BAT_cap:.0f}",
+    #     backgroundcolor="white",
+    # )
+    arrowprops = dict(
+        {"fc": "0.8", "ec": ".8", "width": 0.25, "headwidth": 1.5, "headlength": 3},
+    )
 
-    ax.text(rl_fake_realistic, 1 - td_realistic, "BAT")
+    bbox = dict({"boxstyle": "round", "fc": "0.8", "ec": ".8"})
+    ax[i].annotate(
+        f"BAT:\n{BAT_cap:.0f} t",
+        (rl_fake_realistic, 1 - td_realistic),
+        (0.6, 0.5),
+        bbox=bbox,
+        arrowprops=arrowprops,
+    )
+    ax[i].annotate(
+        f"Inflexible:\n{np.max(data):.0f} t",
+        (0, 0),
+        (0.25, 0.6),
+        bbox=bbox,
+        arrowprops=arrowprops,
+    )
+    print(
+        f"loc: {loc}, BAT storage: {1 - BAT_cap/np.max(data)} frac. of inflexible reduction"
+    )
 
-    cbar = fig.colorbar(CS0)
+    # XTICK locations
+    # minor_ticks = np.linspace(0, 1, 11)
+    minor_ticks = np.concatenate(
+        [
+            np.linspace(0, 0.0009, 10),
+            np.linspace(0.001, 0.009, 10),
+            np.linspace(0.01, 0.09, 10),
+            np.linspace(0.1, 0.2, 2),
+            [1],
+        ]
+    )
+    # ax[i].set_xticks(xticks, np.round(np.interp(xticks, rl_fake, ramp_lims), 2))
+    ax[i].set_xticks(
+        np.interp(minor_ticks, ramp_lims, rl_fake),
+        minor_ticks,
+        minor=True,
+        visible=False,
+    )
 
-    # data = data_surface
-    # # if isinstance(data_name, str):
-    # #     RL, TD, data = get_3d_things(ramp_lims, turndowns, data_name)
-    # # else:
-    # #     data_name = ""
+    # major_ticks = np.linspace(0, 1, 3)
+    # major_ticks = [0, 0.1, 0.2, 1]
+    major_ticks = [0, 0.0001, 0.001, 0.01, 0.1, 1]
+    major_tick_labels = [
+        "0",
+        "$10^{-4}$",
+        "$10^{-3}$",
+        "$10^{-2}$",
+        "$10^{-1}$",
+        "1",
+    ]
+    # ax[i].set_xticks(xticks, np.round(np.interp(xticks, rl_fake, ramp_lims), 2))
+    ax[i].set_xticks(
+        np.interp(major_ticks, ramp_lims, rl_fake),
+        # np.round(major_ticks, 2),
+        major_tick_labels,
+        minor=False,
+    )
 
-    # n_levels = 15
-    # curviness = 1
-    # interp_locs = np.log(np.linspace(np.exp(0), np.exp(curviness), n_levels)) / curviness
-    # levels = np.interp(interp_locs, [0, 1], [np.min(data), np.max(data)])
-    # color_kwargs = {"cmap": cm.plasma, "vmin": np.min(data), "vmax": np.max(data)}
+    d = 0.125
+    kwargs = dict(
+        marker=[(-d, -0.25), (d, 0.25)],
+        markersize=6,
+        linestyle="none",
+        linewidth=0.5,
+        color="k",
+        mec="k",
+        mew=1,
+        clip_on=False,
+    )
 
-    # CSf = ax.contourf(RL, TD, data, alpha=1, levels=levels, **color_kwargs)
-    # CS1 = ax.contour(RL, TD, data, levels=levels, **color_kwargs)
+    ax[i].plot(
+        [0.025, 0.035, 0.9655, 0.975], [0, 0, 0, 0], transform=ax[i].transAxes, **kwargs
+    )
 
-    # rl_real_loc = np.interp(rl_realistic, ramp_lims, np.linspace(1, 0, len(ramp_lims)))
+    ax[i].set_title(f"{loc}")
 
-    # rect_kwargs = {"alpha": 0.5, "facecolor": "white"}
-    # # rect1 = Rectangle([0, 0], rl_real_loc, 1, **rect_kwargs)
-    # # rect2 = Rectangle(
-    # #     [rl_real_loc, 1 - td_realistic], 1 - rl_real_loc, td_realistic, **rect_kwargs
-    # # )
-    # rect1 = Rectangle([0, 0], 1 - rl_real_loc, td_realistic, **rect_kwargs)
-    # rect2 = Rectangle([1 - rl_real_loc, 0], rl_real_loc, 1, **rect_kwargs)
-    # ax.add_patch(rect1)
-    # ax.add_patch(rect2)
 
-    # ax.plot([1 - rl_real_loc, 1 - rl_real_loc], [td_realistic, 1], color="black")
-    # ax.plot([0, 1 - rl_real_loc], [td_realistic, td_realistic], color="black")
-    # ax.clabel(CS1, CS1.levels, inline=True, colors="black")
-    # cbar = fig.colorbar(CSf)
-    # ax.set_xticks(RL[0, :], np.flip(ramp_lims))
-    # ax.set_yticks(turndowns, np.round(turndowns, 2))
-    # ax.invert_xaxis()
-    # # ax.invert_yaxis()
-    # ax.set_xlabel("ramp limit")
-    # ax.set_ylabel("turndown ratio")
+# YTICK locations
 
-    # cbar.set_label(data_name)
 
-    # ax.set_xticks(rl_fake, ramp_lims)
-    # ax.set_yticks(td_fake, turndowns)
+# major_ticks = np.array([0, 0.4, 0.5, 1.0])
+# ax[0].set_yticks(major_ticks, major_ticks, minor=False, visible=True)
+# # ax[1].set_yticks([], [], minor=False, visible=False)
 
-    xticks = np.linspace(0, 1, 6)
-    ax.set_xticks(xticks, np.round(np.interp(xticks, rl_fake, ramp_lims), 2))
+# minor_ticks = np.linspace(0, 1, 11)
+# ax[0].set_yticks(minor_ticks, [], minor=True, visible=False)
+# # ax[1].set_yticks(minor_ticks, [], minor=True, visible=False)
 
-    # xticks = np.linspace(0, 1, 6)
-    # ax.set_xticks(np.interp(xticks, ramp_lims, rl_fake), np.round(xticks, 2))
+# ax[1].tick_params(axis="y", which="both", bottom=False)
 
-    # ax.xaxis.set_major_formatter("{x:.2f}")
+# [label.set_visible(False) for label in ax[1].get_yticklabels()]
 
-    # ax.set_xscale("log")
+# plt.setp(ax[1].get_yticklabels(), visible=False)
+# yticks = np.linspace(0, 1, 3)
+# ax[0].set_yticks(yticks, np.interp(yticks, td_fake, turndowns))
+ax[0].yaxis.set_major_formatter("{x:.1f}")
+ax[0].set_ylabel("Turndown flexibility $f_T$")
 
-    yticks = np.linspace(0, 1, 6)
-    ax.set_yticks(yticks, np.interp(yticks, td_fake, turndowns))
-    ax.yaxis.set_major_formatter("{x:.1f}")
+sp_top = 0.9
+sp_bottom = 0.125
+sp_right = 0.825
+sp_wspace = 0.125
 
-    # cticks = np.linspace(np.min(data), np.max(data), 6)
-    # cbar.set_ticks(cticks, labels=cticks, format=lambda x: f"{x:.2f}")
-    # cbar.ax.yaxis.set_major_formatter("{x:.2g}")
-    cbar.ax.ticklabel_format(useMathText=True)
+fig.subplots_adjust(
+    left=0.08, bottom=sp_bottom, right=sp_right, top=sp_top, wspace=sp_wspace
+)
+cbar_ax = fig.add_axes([sp_right + 0.025, sp_bottom, 0.05, sp_top - sp_bottom])
+cbar = fig.colorbar(CS0, cax=cbar_ax)
+cbar.ax.ticklabel_format(useMathText=True)
+cbar.set_label("$H_2$ Storage capacity (t)")
 
-    cbar.set_label("$H_2$ Storage capacity (kg)")
-
-    ax.set_title(f"{loc}")
-
-    figs.append(fig)
-    axs.append(ax)
-    cbars.append(cbar)
-
-    # cb_low = np.min(cbar.boundaries)
-    # cb_high = np.max(cbar.boundaries)
-
-    # for cb in cbars:
-    #     if np.min(cb.boundaries) < cb_low:
-    #         cb_low = np.min(cb.boundaries)
-    #     if np.max(cb.boundaries) > cb_high:
-    #         cb_high = np.max(cb.boundaries)
-
-    # for fig in figs:
-    fig.tight_layout()
-    fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.png", format="png")
-    fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.pdf", format="pdf")
+# fig.tight_layout()
+fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.png", format="png")
+fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.pdf", format="pdf")
 
 
 plt.show()

@@ -125,9 +125,15 @@ if run_HOPP:
     # ramp_lims = [0.2]
     # turndowns = np.linspace(0.05, 0.95, 19)
 
-    # flexibility parameters for heatmaps
+    # flexibility parameters for heatmaps from 1-19-2024
     # ramp_lims = [0.01, 0.1, 0.2, 0.5, 0.75]
-    ramp_lims = np.logspace(-2, -2 - (-2 - np.log10(0.2)) / 4 * 6, 7)
+    # ramp_lims = np.logspace(-2, -2 - (-2 - np.log10(0.2)) / 4 * 6, 7)
+
+    # from 1-22-2024
+    low = np.log10(1 / 8760)
+    highest = np.log10(0.9)
+
+    ramp_lims = np.logspace(low, -low - (-low - np.log10(0.2)) / 6 * 6, 8)
     turndowns = np.linspace(0.1, 0.9, 9)
 
     # Always include inflexible case and fully flexible case

@@ -19,7 +19,7 @@ elif style == "pres":
 # plt.rcParams["text.usetex"] = True
 
 
-data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
+data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
 save_path = Path(__file__).parents[1] / "plots"
 
 
@@ -78,9 +78,9 @@ def LPF_ma(data, width):
     for i in range(len(std_dev)):
         std_dev[i] = np.std(data[i : i + width])
     num_intervals = 10
-    # intervals = np.zeros([len(filtered_data), num_intervals, 2])
-    # for i in range(len(filtered_data)):
-    #     intervals[i, :, :] = get_intervals(data[i : i + width], num_intervals)
+    intervals = np.zeros([len(filtered_data), num_intervals, 2])
+    for i in range(len(filtered_data)):
+        intervals[i, :, :] = get_intervals(data[i : i + width], num_intervals)
 
     filtered_data = np.interp(
         np.arange(0, 8760, 1), np.linspace(0, 8760, int(8760 - width)), filtered_data
@@ -89,30 +89,19 @@ def LPF_ma(data, width):
         np.arange(0, 8760, 1), np.linspace(0, 8760, int(8760 - width)), std_dev
     )
     intervals_8760 = np.zeros([8760, num_intervals, 2])
-    # for i in range(num_intervals):
-    #     intervals_8760[:, i, 0] = np.interp(
-    #         np.arange(0, 8760, 1),
-    #         np.linspace(0, 8760, int(8760 - width)),
-    #         intervals[:, i, 0],
-    #     )
-    #     intervals_8760[:, i, 1] = np.interp(
-    #         np.arange(0, 8760, 1),
-    #         np.linspace(0, 8760, int(8760 - width)),
-    #         intervals[:, i, 1],
-    #     )
+    for i in range(num_intervals):
+        intervals_8760[:, i, 0] = np.interp(
+            np.arange(0, 8760, 1),
+            np.linspace(0, 8760, int(8760 - width)),
+            intervals[:, i, 0],
+        )
+        intervals_8760[:, i, 1] = np.interp(
+            np.arange(0, 8760, 1),
+            np.linspace(0, 8760, int(8760 - width)),
+            intervals[:, i, 1],
+        )
 
     return filtered_data, std_dev, intervals_8760
-
-
-# fig, ax = plt.subplots(1, 2, figsize=(7.2, 3), dpi=200)
-# num_intervals = 100
-# intervals0 = get_intervals(gen_profiles[:, 0], num_intervals)
-# intervals1 = get_intervals(gen_profiles[:, 1], num_intervals)
-
-# ax[0].plot(intervals0[:, 0], np.linspace(0, 1, num_intervals))
-# ax[0].plot(intervals0[:, 1], np.linspace(0, 1, num_intervals))
-# ax[1].plot(intervals1[:, 0], np.linspace(0, 1, num_intervals))
-# ax[1].plot(intervals1[:, 1], np.linspace(0, 1, num_intervals))
 
 
 # ma_widths = [1, 24, 30 * 24, 90 * 24]
@@ -248,78 +237,71 @@ print(
 hrs = np.linspace(0, 8760, 8760)
 
 
-def plot_mean_std(profile, ax, plot_caret):
+def plot_mean_std(profile, ax):
     factor = 1e-3
     ma, std, intervals = LPF_ma(factor * profile[:, 0], ma_widths[-1])
-    ax.plot(hrs, ma, color="blue", label="TX 3-mo. avg.")
-    ax.fill_between(
-        np.linspace(0, 8760, 8760),
-        ma - std,
-        ma + std,
-        zorder=0.95,
-        color="blue",
-        alpha=0.125,
-    )
-    # for i in range(np.shape(intervals)[1]):
-    #     ax[0].fill_between(
-    #         np.linspace(0, 8760, 8760),
-    #         intervals[:, i, 0],
-    #         intervals[:, i, 1],
-    #         # alpha=1 - 0.5 - (i / 20),
-    #         color=cm.plasma(i / 10),
-    #         zorder=1 - i / 100,
-    #     )
-    if plot_caret:
-        ax.plot(np.argmax(ma), np.max(ma), marker=7, color="blue", markersize=4)
-        ax.plot(np.argmin(ma), np.min(ma), marker=6, color="blue", markersize=4)
-
-    ax.plot(hrs, ma - std, color="blue", linestyle="dashed", alpha=0.5)
-    ax.plot(
-        hrs, ma + std, color="blue", linestyle="dashed", alpha=0.5, label="std. dev."
-    )
+    ax[0].plot(hrs, ma, color="blue", label="TX 3-mo. avg.")
+    # ax.fill_between(
+    #     np.linspace(0, 8760, 8760),
+    #     ma - std,
+    #     ma + std,
+    #     zorder=0.95,
+    #     color="blue",
+    #     alpha=0.125,
+    # )
+    for i in range(np.shape(intervals)[1]):
+        ax[0].fill_between(
+            np.linspace(0, 8760, 8760),
+            intervals[:, i, 0],
+            intervals[:, i, 1],
+            # alpha=1 - 0.5 - (i / 20),
+            color=cm.plasma(i / 10),
+            zorder=1 - i / 100,
+        )
+    # ax[0].plot(hrs, ma - std, color="blue", linestyle="dashed", alpha=0.5)
+    # ax[0].plot(
+    #     hrs, ma + std, color="blue", linestyle="dashed", alpha=0.5, label="std. dev."
+    # )
 
     ma, std, intervals = LPF_ma(factor * profile[:, 1], ma_widths[-1])
-    ax.plot(hrs, ma, color="orange", label="IA 3-mo. avg.")
-    ax.fill_between(
-        np.linspace(0, 8760, 8760),
-        ma - std,
-        ma + std,
-        zorder=0.95,
-        color="orange",
-        alpha=0.125,
-    )
-    if plot_caret:
-        ax.plot(np.argmax(ma), np.max(ma), marker=7, color="orange", markersize=4)
-        ax.plot(np.argmin(ma), np.min(ma), marker=6, color="orange", markersize=4)
-    # for i in range(np.shape(intervals)[1]):
-    #     ax[1].fill_between(
-    #         np.linspace(0, 8760, 8760),
-    #         intervals[:, i, 0],
-    #         intervals[:, i, 1],
-    #         # alpha=1 - 0.5 - (i / 20),
-    #         color=cm.plasma(i / 10),
-    #         zorder=1 - i / 100,
-    #     )
-    ax.plot(hrs, ma - std, color="orange", linestyle="dashed", alpha=0.5)
-    ax.plot(
-        hrs, ma + std, color="orange", linestyle="dashed", alpha=0.5, label="std. dev."
-    )
+    ax[1].plot(hrs, ma, color="orange", label="IN 3-mo. avg.")
+    # ax.fill_between(
+    #     np.linspace(0, 8760, 8760),
+    #     ma - std,
+    #     ma + std,
+    #     zorder=0.95,
+    #     color="orange",
+    #     alpha=0.125,
+    # )
+    for i in range(np.shape(intervals)[1]):
+        ax[1].fill_between(
+            np.linspace(0, 8760, 8760),
+            intervals[:, i, 0],
+            intervals[:, i, 1],
+            # alpha=1 - 0.5 - (i / 20),
+            color=cm.plasma(i / 10),
+            zorder=1 - i / 100,
+        )
+    # ax[1].plot(hrs, ma - std, color="orange", linestyle="dashed", alpha=0.5)
+    # ax[1].plot(
+    #     hrs, ma + std, color="orange", linestyle="dashed", alpha=0.5, label="std. dev."
+    # )
 
 
-fig, ax = plt.subplots(1, 3, sharey="all", sharex="all", figsize=(7.2, 3))
-plot_mean_std(wind_profiles, ax[0], False)
-plot_mean_std(solar_profiles, ax[1], False)
-plot_mean_std(gen_profiles, ax[2], True)
-ax[1].legend()
+fig, ax = plt.subplots(2, 3, sharey="all", sharex="all", figsize=(7.2, 3), dpi=200)
+plot_mean_std(wind_profiles, ax[:, 0])
+plot_mean_std(solar_profiles, ax[:, 1])
+plot_mean_std(gen_profiles, ax[:, 2])
+# ax[1].legend()
 
-ax[0].set_title("Wind generation")
-ax[1].set_title("Solar generation")
-ax[2].set_title("Hybrid generation")
-ax[0].set_xticks(np.arange(0, 8760, 2400))
-ax[0].set_ylabel("MW")
+# ax[0].set_title("Wind generation")
+# ax[1].set_title("Solar generation")
+# ax[2].set_title("Hybrid generation")
+# ax[0].set_xticks(np.arange(0, 8760, 2400))
+# ax[0].set_ylabel("MW")
 
-for axis in ax:
-    axis.set_xlabel("Hour")
+# for axis in ax:
+#     axis.set_xlabel("Hour")
 
 fig.tight_layout()
 fig.savefig(
@@ -327,53 +309,4 @@ fig.savefig(
     format="png",
     dpi=300,
 )
-
-
-# fig, ax = plt.subplots(1, 1, sharey="row", figsize=(3.5, 3.5))
-
-# ax = [ax]
-
-# ma_tx, std_tx, intervals_tx = LPF_ma(gen_profiles[:, 0] * 1e-3, ma_widths[-1])
-# ma_ia, std_ia, intervals_ia = LPF_ma(gen_profiles[:, 1] * 1e-3, ma_widths[-1])
-# # ma_tx, std_tx, intervals_tx = LPF_ma(gen_profiles[:, 0] * 1e-3, 8700)
-# # ma_ia, std_ia, intervals_ia = LPF_ma(gen_profiles[:, 1] * 1e-3, 8700)
-
-# hrs = np.linspace(0, 8760, 8760)
-
-# ax[0].plot(hrs, ma_tx, color="blue")
-# ax[0].hlines(
-#     [np.min(ma_tx), np.max(ma_tx)],
-#     0,
-#     8760,
-#     linestyle="dashed",
-#     color="blue",
-#     zorder=0.5,
-# )
-# ax[0].text(
-#     1000,
-#     np.min(ma_tx),
-#     f"{np.min(ma_tx)/np.max(ma_tx):.2f}",  # , transform=ax[0].transAxes
-# )
-
-# ax[0].plot(hrs, ma_ia, color="orange")
-# ax[0].hlines(
-#     [np.min(ma_ia), np.max(ma_ia)],
-#     0,
-#     8760,
-#     linestyle="dashed",
-#     color="orange",
-#     zorder=0.5,
-# )
-# ax[0].text(
-#     1000,
-#     np.min(ma_ia),
-#     f"{np.min(ma_ia)/np.max(ma_ia):.2f}",  # , transform=ax[0].transAxes
-# )
-# ax[0].set_ylim([0, 1.1 * np.max(ma_tx)])
-
-
-# fig.tight_layout()
-# plt.show()
-
-
 []

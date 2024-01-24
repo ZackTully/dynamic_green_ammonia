@@ -4,6 +4,18 @@ import matplotlib.pyplot as plt
 from matplotlib.sankey import Sankey
 
 
+from pathlib import Path
+
+style = "paper"
+
+if style == "paper":
+    plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
+elif style == "pres":
+    plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
+
+
+save_path = Path(__file__).parents[1] / "plots"
+
 # Hydrogen
 # https://www.engineeringtoolbox.com/fuels-higher-calorific-values-d_169.html
 rho_h2 = 0.090  # [kg/m^3]
@@ -45,6 +57,84 @@ mass_frac = np.array([kgpkg_H2, kgpkg_N2, 0])
 
 # per 1 kWh of electricity
 
+
+def smooth_line(x0, y0, x1, y1):
+    # y = ax**3 + bx**2 + cx + d
+    # y' = 3ax**2 + 2bx + c + 0
+
+    A = np.array(
+        [
+            [x0**3, x0**2, x0, 1],  # y(x0) = y0
+            [x1**3, x1**2, x1, 1],  # y(x1) = y1
+            [3 * x0**2, 2 * x0, 1, 0],  # y'(x0) = 0
+            [3 * x1**2, 2 * x1, 1, 0],
+        ]
+    )  # y'(x1) = 0
+    b = np.array([y0, y1, 0, 0])
+    abcd = np.linalg.inv(A) @ b
+
+    x = np.linspace(x0, x1, 100)
+    y = abcd[0] * x**3 + abcd[1] * x**2 + abcd[2] * x + abcd[3]
+    return x, y
+
+
+fig, ax = plt.subplots(1, 1, figsize=[3.5, 3])
+
+
+x_pos = [0, 1, 2]
+left_points = np.array([[0, 0.6], [0.6, 0.8], [0.8, 10.4]])
+mid_points = np.array([[-0.2, 0.4], [0.6, 0.8], [1, 10.6]])
+right_points = left_points = np.array([[0, 0.6], [0.6, 0.8], [0.8, 10.4]])
+
+left_colors = ["blue", "blue", "blue"]
+right_colors = ["blue", "orange", "orange"]
+# power, nitrogen, hydrogen
+# leftleft_text = [f"{engy_pkg[0]} kWh", f"{engy_pkg[1]} kWh", f"{engy_pkg[2]} kWh"]
+# leftright_text = []
+# rightleft_text = []
+# rightright_text = []
+
+left_text = [
+    f"{engy_pkg[2]:.2f} kWh H2",
+    f"{engy_pkg[1]:.2f} kWh N2",
+    f"{engy_pkg[0]:.2f} kWh NH3",
+]
+right_text = [f"", f"{mass_frac[1]:.2f} kg N2", f"{mass_frac[0]:.2f} kg H2"]
+
+outline_kwargs = dict(color="black", linewidth=0.25)
+
+ax.text(-0.05, 5, "10.18 kWh", ha="right")
+ax.text(2.05, 5, "1 kg NH3", ha="left")
+
+for i in range(np.shape(left_points)[0]):
+    # fill left to mid
+    bot_x, bot_y = smooth_line(x_pos[0], left_points[i, 0], x_pos[1], mid_points[i, 0])
+    top_x, top_y = smooth_line(x_pos[0], left_points[i, 1], x_pos[1], mid_points[i, 1])
+    ax.fill_between(bot_x, bot_y, top_y, color=left_colors[i])
+
+    ax.plot(bot_x, bot_y, **outline_kwargs)
+    ax.plot(top_x, top_y, **outline_kwargs)
+    ax.text(0.5 * (x_pos[0] + x_pos[1]), np.mean(left_points[i, :]), left_text[i])
+
+    # fill mid to right
+    bot_x, bot_y = smooth_line(x_pos[1], mid_points[i, 0], x_pos[2], right_points[i, 0])
+    top_x, top_y = smooth_line(x_pos[1], mid_points[i, 1], x_pos[2], right_points[i, 1])
+    ax.fill_between(bot_x, bot_y, top_y, color=right_colors[i])
+    ax.plot(bot_x, bot_y, **outline_kwargs)
+    ax.plot(top_x, top_y, **outline_kwargs)
+
+    ax.plot([x_pos[0], x_pos[0]], left_points[i, :], **outline_kwargs)
+    ax.plot([x_pos[1], x_pos[1]], mid_points[i, :], **outline_kwargs)
+    ax.plot([x_pos[2], x_pos[2]], right_points[i, :], **outline_kwargs)
+    ax.text(0.5 * (x_pos[1] + x_pos[2]), np.mean(left_points[i, :]), right_text[i])
+
+
+ax.spines[["left", "top", "right", "bottom"]].set_visible(False)
+ax.set_xticks([])
+ax.set_yticks([])
+
+
+fig.savefig(save_path / "sankey.png", format="png")
 
 # Sankey diagram
 # sankey = Sankey()

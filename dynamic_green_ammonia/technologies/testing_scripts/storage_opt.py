@@ -6,31 +6,39 @@ from pathlib import Path
 
 print_matrices = False
 rootdir = Path(__file__).parents[2]
-H2_gen = np.load(rootdir / "data" / "hybrid_gen.npy")
-H2_gen = np.load(rootdir / "data" / "H2_gen.npy")
+# H2_gen = np.load(rootdir / "data" / "hybrid_gen.npy")
+# H2_gen = np.load(rootdir / "data" / "H2_gen.npy")
+H2_gen = np.load(Path(__file__).parents[2] / "data" / "heatmap_runs" / "H2_gen.npy")
+H2_gen = H2_gen[0, :]
 
-N = 810
+N = 250
 # N = len(H2_gen)
 
-shift = 0
-H2_gen = H2_gen[shift : N + shift]
+# shift = 0
+# H2_gen = H2_gen[shift : N + shift]
 
 # plant paramaters
 td = 0.25
-rl = 0.5 * (1 - td)
+rl = 0.3 * (1 - td)
 # These parameters cause the weird behavior
 # td = 0.05
 # rl = 0.05 * (1 - td)
 
-td = 0.57142857
-rl = 0
+td = 0.25
+rl = 0.99
 
-center = np.interp(td, [0, 1], [np.max(H2_gen) / 2, np.mean(H2_gen)])
-# center = np.mean(H2_gen)
-max_demand = (2 / (td + 1)) * center
-min_demand = td * max_demand
+# center = np.interp(td, [0, 1], [np.max(H2_gen) / 2, np.mean(H2_gen)])
+# # center = np.mean(H2_gen)
+# max_demand = (2 / (td + 1)) * center
+# min_demand = td * max_demand
+# R = rl * max_demand
+
+A = np.array([[1, -np.max(H2_gen)], [1, -np.mean(H2_gen)]])
+b = np.array([0, np.mean(H2_gen)])
+coeffs = np.linalg.inv(A) @ b
+max_demand = coeffs[0] / (td + coeffs[1])
+min_demand = td * coeffs[0] / (td + coeffs[1])
 R = rl * max_demand
-
 
 # H2_gen = np.linspace(0, 1.5 * max_demand, N) + 3 * np.random.random(N)
 
@@ -53,7 +61,6 @@ bound_l = np.concatenate(
         [None, None],  # storage state max, min lower bound
     ]
 )
-
 
 bound_u = np.concatenate(
     [
@@ -203,13 +210,16 @@ print(f"Capacity: {(res.x[-2] - res.x[-1])}")
 print(f"Integral: {np.sum(res.x[N:2*N])}")
 
 time = np.linspace(0, N - 1, N)
+# t_start = 0
+# t_end = 100
+# time = np.linspace(t_start, t_end, t_end - t_start)
 
 fig, ax = plt.subplots(3, 1, sharex="col")
 ax[0].hlines(
     [min_demand, max_demand], 0, time[-1], alpha=0.5, linewidth=0.5, color="black"
 )
 
-ax[0].plot(time, H2_gen, label="generation")
+ax[0].plot(time, H2_gen[0:N], label="generation")
 ax[0].plot(time, res.x[0:N], label="demand")
 ax[0].set_ylabel("H2 flow [kg/hr]")
 ax[0].legend()
@@ -280,6 +290,27 @@ ax[1].set_ylabel("ramp rate")
 ax[2].set_ylabel("xmax/xmin")
 ax[3].set_ylabel("demand bounds")
 ax[4].set_ylabel("state bounds")
+
+
+fig, ax = plt.subplots(1, 1)
+ax = [ax]
+
+t_start = 0
+t_end = 100
+time = np.arange(t_start, t_end, 1)
+
+ax[0].hlines(
+    [min_demand, max_demand],
+    time[0],
+    time[-1],
+    linewidth=0.5,
+    color="black",
+    linestyle="dashed",
+)
+
+ax[0].plot(time, H2_gen[t_start:t_end], color="blue", linewidth=0.5, label="generation")
+ax[0].plot(time, res.x[t_start:t_end], color="orange", label="demand")
+ax[0].set_ylabel("H2 flow [kg/hr]")
 
 plt.show()
 
@@ -699,6 +730,6 @@ ax[0].set_title("demand")
 ax[1].plot(charge)
 ax[1].set_title("charge")
 fig.suptitle(f"Storage Capacity: {capacity:.2f}")
-fig.savefig("dynamic_green_ammonia/plots/LCOA_heatmap.png", dpi=300, format="png")
+# fig.savefig("dynamic_green_ammonia/plots/LCOA_heatmap.png", dpi=300, format="png")
 plt.show()
 []
