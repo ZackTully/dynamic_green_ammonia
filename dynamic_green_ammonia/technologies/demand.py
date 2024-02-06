@@ -116,8 +116,8 @@ class DemandOptimization:
         bound_l = np.concatenate(
             [
                 [u_min] * N,  # demand lower bound
-                [0] * N,  # storage state lower bound
-                [None, 0],  # storage state max, min lower bound
+                [None] * N,  # storage state lower bound
+                [None, None],  # storage state max, min lower bound
             ]
         )
 
@@ -128,6 +128,13 @@ class DemandOptimization:
                 [None, None],  # storage state max, min upper bound
             ]
         )
+
+        # Non-negative state
+        Aub_state = np.zeros([N, N + N + 2])
+        bub_state = np.zeros(N)
+
+        for k in range(N):
+            Aub_state[k, N + k] = -1
 
         # Positive demand ramp rate limit
         Aub_ramp_pos = np.zeros([N, N + N + 2])
@@ -197,14 +204,17 @@ class DemandOptimization:
         Aeq_dyn[N - 1, N] = -1
         Aeq_dyn[N - 1, 2 * N - 1] = 1
 
-        A_ub = np.concatenate([Aub_ramp_pos, Aub_ramp_neg, Aub_xmax, Aub_xmin])
-        b_ub = np.concatenate([bub_ramp_pos, bub_ramp_neg, bub_xmax, bub_xmin])
+        A_ub = np.concatenate(
+            [Aub_state, Aub_ramp_pos, Aub_ramp_neg, Aub_xmax, Aub_xmin]
+        )
+        b_ub = np.concatenate(
+            [bub_state, bub_ramp_pos, bub_ramp_neg, bub_xmax, bub_xmin]
+        )
 
         A_eq = Aeq_dyn
         b_eq = beq_dyn
 
         bounds = [(bound_l[i], bound_u[i]) for i, bl in enumerate(bound_l)]
-
 
         if self.x0 is not None:
             res = linprog(
@@ -214,9 +224,9 @@ class DemandOptimization:
                 A_eq=A_eq,
                 b_eq=b_eq,
                 bounds=bounds,
-                x0=self.x0
+                x0=self.x0,
             )
-        else: 
+        else:
             res = linprog(
                 c=C,
                 A_ub=A_ub,

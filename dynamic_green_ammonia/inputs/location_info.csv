@@ -1,0 +1,22 @@
+﻿loc,lat,lon,elevation,note
+IN,41.62,-87.22,1099,green steel sites
+MS,30.45,-89.35,1099,green steel sites
+WY,42,-105.4,1099,green steel sites
+MN,47.5233,-92.5366,1099,green steel sites
+GA,33.45082,-85.2618,1099,green steel sites
+TX,34.22,-102.74,3800,green steel sites
+TX,30.735,-102.457,3800,Max CF
+TX,32.257,-99.256,3800,Min LCOH
+TX,36.069,-102.819,3800,Min storage
+TX,29.556,-99.636,3800,Complimentarity
+TX,33.364,-98.526,3800,CF and storage
+TX,32.257,-99.255,3800,Wind CF
+TX,31.375,-104.925,3800,PV CF
+IA,42.55,-90.69,600,green steel sites
+IA,41.817,-94.881,600,Max CF
+IA,43.401,-91.22,600,Min LCOH
+IA,41.494,-92.834,600,Min storage
+IA,40.674,-91.425,600,Complimentarity
+IA,41.817,-94.882,600,CF and storage
+IA,41.817,-94.883,600,Wind CF
+IA,40.74,-94.466,600,PV CF

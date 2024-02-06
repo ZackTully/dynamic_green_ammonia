@@ -15,9 +15,6 @@ elif style == "pres":
     plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
 
 
-location = "IN"
-analysis_type = "full_sweep"
-
 # data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
 data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
 save_path = Path(__file__).parents[1] / "plots"
@@ -102,13 +99,13 @@ for i, loc in enumerate(locations):
     # y_locs = y_locs[np.where(levels <= np.max(data))[0]]
     y_locs = y_locs[np.where(y_locs > 0)[0]]
 
-    x_locs = 0.85 * np.ones(len(y_locs))
+    x_locs = 0.6 * np.ones(len(y_locs))
 
     manual_locations = np.stack([x_locs, y_locs])[:, 1:].T
     clabels = ax[i].clabel(
         CS1,
         inline=True,
-        fontsize=10,
+        fontsize=7,
         colors="black",
         manual=manual_locations,
     )
@@ -147,14 +144,14 @@ for i, loc in enumerate(locations):
     ax[i].annotate(
         f"BAT:\n{BAT_cap:.0f} t",
         (rl_fake_realistic, 1 - td_realistic),
-        (0.6, 0.5),
+        (0.75, 0.5),
         bbox=bbox,
         arrowprops=arrowprops,
     )
     ax[i].annotate(
         f"Inflexible:\n{np.max(data):.0f} t",
         (0, 0),
-        (0.25, 0.6),
+        (0.2, 0.7),
         bbox=bbox,
         arrowprops=arrowprops,
     )
@@ -254,8 +251,8 @@ cbar.ax.ticklabel_format(useMathText=True)
 cbar.set_label("$H_2$ Storage capacity (t)")
 
 # fig.tight_layout()
-fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.png", format="png")
-fig.savefig(save_path / f"Capacity_heat_{loc}_{style}.pdf", format="pdf")
+fig.savefig(save_path / f"Capacity_heat_{style}.png", format="png")
+fig.savefig(save_path / f"Capacity_heat_{style}.pdf", format="pdf")
 
 
 plt.show()

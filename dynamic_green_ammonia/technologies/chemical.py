@@ -47,7 +47,6 @@ class Electrolzyer:
         self.opex_kgpday = 0.05 * self.capex_kgpday
 
 
-
 class HaberBosch:
     def __init__(self, dt, rating):
         self.t = 0
@@ -63,7 +62,7 @@ class HaberBosch:
         # N2 + 3 H2 <-> 2 NH3
         self.kgpkg_H2 = (3 / 2) * self.molmass_H2 / self.molmass_NH3  # kg H2 per kg NH3
         self.kgpkg_N2 = (1 / 2) * self.molmass_N2 / self.molmass_NH3  # kg N2 per kg NH3
-        self.energypkg_NH3 = 0.6  # kWh/kg
+        self.energypkg_NH3 = 0.6  # kWh/kg  from [1]
 
         self.rating_kgNH3 = (
             self.rating * self.dt / 3600 / self.energypkg_NH3
@@ -100,9 +99,11 @@ class HaberBosch:
             (P_in_kWh - NH3 * self.energypkg_NH3) * 3600 / self.dt,
         ]
 
-        return NH3, reject
+        return NH3, reject  # NH3 out in kg/hr
 
     def calc_financials(self, rating_elec, rating_kg_phr):
+        # from [1]
+
         self.rating_elec = rating_elec
         self.rating_NH3 = rating_kg_phr
 
@@ -130,12 +131,13 @@ class AirSeparationUnit:
         return N2, reject
 
     def calc_financials(self, rating_elec, rating_kg_phr):
+        # from [1]
         self.rating_elec = rating_elec
         self.rating_N2 = rating_kg_phr
 
         rating_ton_pday = rating_kg_phr * 1e-3 * 24
 
-        self.K = 9.2e5
+        self.K = 9.2e5 / (0.8224468815584438) # divide by 0.822 to convert from kg N2 to kg NH3
         self.n = 0.49
 
         self.capex = self.K * rating_ton_pday**self.n

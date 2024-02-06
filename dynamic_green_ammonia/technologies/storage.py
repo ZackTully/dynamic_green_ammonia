@@ -119,9 +119,11 @@ class DynamicAmmoniaStorage:
         )
 
         self.battery = Battery(siteinfo, config)
-        self.battery.simulate_financials(1e6, 25)
+        self.battery.simulate_financials(1e10, 25)
         self.battery_capex = self.battery.cost_installed
         self.battery_opex = self.battery.om_total_expense
+
+        # print(self.battery.cost_installed, np.sum(self.battery.om_total_expense))
 
     def calc_electrolysis_financials(self):
         """Instantiate a HOPP electrolyzer model and calculate its financials"""
@@ -160,7 +162,7 @@ class DynamicAmmoniaStorage:
             self.H2_summary,
             self.energy_input_to_electrolyzer,
         ) = run_h2_PEM.run_h2_PEM(*run_h2_inputs)
-        PEM_cost = PEM_costs_Singlitico_model.PEMCostsSingliticoModel(0)
-        PEM_capex, PEM_opex = PEM_cost.run(electrolyzer_size_mw * 1e-3, 600)
+        self.PEM_cost = PEM_costs_Singlitico_model.PEMCostsSingliticoModel(0)
+        PEM_capex, PEM_opex = self.PEM_cost.run(electrolyzer_size_mw * 1e-3, 600)
         self.EL_capex = PEM_capex * 1e6
         self.EL_opex = PEM_opex * 1e6

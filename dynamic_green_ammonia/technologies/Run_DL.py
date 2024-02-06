@@ -369,8 +369,8 @@ class RunDL:
                         "opex": self.ASU.opex * self.plant_life,
                     },
                     "HB": {
-                        "NH3_tot": NH3_tot,
-                        "NH3_max": NH3_max,
+                        "NH3_tot": NH3_tot,  
+                        "NH3_max": NH3_max,  # kg/hr
                         "P_HB_max": P_HB_max,
                         "rating_elec": self.HB.rating_elec,
                         "rating_NH3": self.HB.rating_NH3,

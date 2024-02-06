@@ -10,13 +10,17 @@ import pandas as pd
 from dynamic_green_ammonia.technologies.Run_DL import RunDL, FlexibilityParameters
 
 
-save_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
+# save_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
+# save_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
+save_path = Path(__file__).parents[1] / "data" / "cases_check"
+
+input_path = Path(__file__).parents[1] / "inputs"
 
 generate_HOPP_files = True
 run_HOPP = True
 
 if generate_HOPP_files:
-    folder = "dynamic_green_ammonia/inputs/HOPP_sweep_inputs"
+    folder = input_path / "HOPP_sweep_inputs"
     for filename in os.listdir(folder):
         file_path = os.path.join(folder, filename)
         try:
@@ -28,8 +32,8 @@ if generate_HOPP_files:
         except Exception as e:
             print("failed to delete %s. Reason: %s" % (file_path, e))
 
-    def update_dict(base_dict, year, loc, elev, hybrid_rating, split):
-        save_name = f"year{year}_lat{loc[0]}_lon{loc[1]}_split0p{split*100:.0f}"
+    def update_dict(base_dict, year, note, loc, elev, hybrid_rating, split):
+        save_name = f"year{year}_lat{loc[0]}_lon{loc[1]}_split0p{split*100:.0f}_{note}"
 
         wind_rating = split * hybrid_rating
         num_turbines = np.round(wind_rating / 5e3)
@@ -39,7 +43,12 @@ if generate_HOPP_files:
         save_dict = base_dict.copy()
         save_dict.update({"name": save_name})
         save_dict["site"]["data"].update(
-            {"lat": loc[0], "lon": loc[1], "year": year, "elev": elev}
+            {
+                "lat": float(loc[0]),
+                "lon": float(loc[1]),
+                "year": year,
+                "elev": float(elev),
+            }
         )
         save_dict["technologies"]["pv"].update({"system_capacity_kw": int(pv_rating)})
         save_dict["technologies"]["wind"].update(
@@ -52,38 +61,89 @@ if generate_HOPP_files:
 
     # generate HOPP input files for sweep
 
+    loc_info = pd.read_csv(input_path / "location_info.csv")
+
+    data_path = Path(__file__).parent / "data" / "HOPP_sweep"
+
+    run_type = str(save_path).split("/")[-1]
+
+    if "cases" in run_type:
+        print("Analysis type: CHECK CASES")
+
+        ramp_lims = [0, 0.2]
+        turndowns = [1, 0.6]
+        rltd = [(ramp_lims[i], turndowns[i]) for i in range(len(ramp_lims))]
+
+        # custom_index = [5, 7, 8, 9, 10, 11, 13, 14, 15, 16]
+        # custom_index = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        # run_cases = loc_info.loc[custom_index]
+
+        run_cases = loc_info[loc_info["loc"].isin(["TX", "IA"])]
+
+    else:
+        if "heatmap" in run_type:
+            print("Analysis type: HEATMAP")
+
+            low = np.log10(1 / 8760)
+            highest = np.log10(0.9)
+            ramp_lims = np.logspace(low, -low - (-low - np.log10(0.2)) / 6 * 6, 8)
+            turndowns = np.linspace(0.1, 0.9, 9)
+
+            # Always include inflexible case and fully flexible case
+            ramp_lims = np.concatenate([[0], ramp_lims, [1]])
+            turndowns = np.concatenate([[0], turndowns, [1]])
+
+            custom_index = [10, 16]
+            run_cases = loc_info.loc[custom_index]
+
+        elif "LCOA" in run_type:
+            print("Analysis type: LCOA")
+
+            ramp_lims = [0.2]
+            turndowns = np.linspace(0, 1, 20)
+
+        rltd = []  # tuples of (rl, td)
+        for rl in ramp_lims:
+            for td in turndowns:
+                rltd.append((rl, td))
+
+        # custom_index = [0, 5, 11, 10, 16]
+        custom_index = [10, 16]
+        run_cases = loc_info.loc[custom_index]
+
     # years = [2007, 2008, 2009, 2010, 2011, 2012, 2013]
     years = [2012]
-    all_loc_names = ["IN", "TX", "IA", "MS", "WY", "MN", "GA"]
-    all_loc_coords = [
-        [41.62, -87.22],
-        [34.22, -102.75],
-        [42.55, -90.69],
-        [30.45, -89.35],
-        [42.00, -105.40],
-        [47.5233, -92.5366],
-        [33.45082, -85.2618],
-    ]
-    base_elev = 1099
-    all_elevations = [base_elev, 3800, 600, base_elev, base_elev, base_elev, base_elev]
 
-    loc_names = ["TX", "IA"]
-    # loc_names = ["IA"]
-    locations = [all_loc_coords[all_loc_names.index(ln)] for ln in loc_names]
-    elevations = [all_elevations[all_loc_names.index(ln)] for ln in loc_names]
+    # loc_type = [
+    #     "green steel sites",
+    #     "Max CF",
+    #     "Min LCOH",
+    #     "Min storage",
+    #     "Complimentarity",
+    #     "CF and storage",
+    # ]
+    # state_index = loc_info["loc"].isin(["IN", "TX", "IA"])
 
-    hybrid_rating = 1e6  # [kW]
-    # wind_pv_split = np.linspace(0.01, 0.99, 10)
+    locations = run_cases[["lat", "lon"]].to_numpy()
+    elevations = run_cases["elevation"].to_numpy()
+
+    hybrid_rating = 1e6  # [kW] 1 GW plant
     wind_pv_split = [0.5]
 
     base_file = open("dynamic_green_ammonia/inputs/BASEFILE_hopp_input.yaml", "r")
     base_dict = yaml.load(base_file, yaml.Loader)
 
     for year in years:
-        for i, location in enumerate(locations):
+        for i in range(locations.shape[0]):
             for split in wind_pv_split:
                 save_dict, save_name = update_dict(
-                    base_dict, year, location, elevations[i], hybrid_rating, split
+                    base_dict,
+                    year,
+                    run_cases.iloc[i]["note"],
+                    locations[i, :],
+                    elevations[i],
+                    hybrid_rating,
+                    split,
                 )
                 save_file = open(
                     "".join(
@@ -110,45 +170,6 @@ if run_HOPP:
         )
         return curr
 
-    data_path = Path(__file__).parent / "data" / "HOPP_sweep"
-
-    ramp_lims, turndowns = FlexibilityParameters(
-        analysis="full_sweep", n_ramps=5, n_tds=5
-    )
-
-    # 140 hopp cases
-
-    # ramp_lims = np.array([1, 2, 4, 12, 87.6, 876, 2 * 876, 0.5 * 8760]) / 8760
-    # turndowns = np.linspace(0.1, 0.9, 5)
-
-    # flexibility parameters for LCOA pltos
-    # ramp_lims = [0.2]
-    # turndowns = np.linspace(0.05, 0.95, 19)
-
-    # flexibility parameters for heatmaps from 1-19-2024
-    # ramp_lims = [0.01, 0.1, 0.2, 0.5, 0.75]
-    # ramp_lims = np.logspace(-2, -2 - (-2 - np.log10(0.2)) / 4 * 6, 7)
-
-    # from 1-22-2024
-    low = np.log10(1 / 8760)
-    highest = np.log10(0.9)
-
-    ramp_lims = np.logspace(low, -low - (-low - np.log10(0.2)) / 6 * 6, 8)
-    turndowns = np.linspace(0.1, 0.9, 9)
-
-    # Always include inflexible case and fully flexible case
-    ramp_lims = np.concatenate([[0], ramp_lims, [1]])
-    turndowns = np.concatenate([[0], turndowns, [1]])
-
-    rltd = []  # tuples of (rl, td)
-    # rltd.append((0, 1))  # inflexible case
-
-    for rl in ramp_lims:
-        for td in turndowns:
-            rltd.append((rl, td))
-
-    # rltd.append((1, 0))  # flexible case
-
     hopp_files = os.listdir("dynamic_green_ammonia/inputs/HOPP_sweep_inputs")
     H2_profiles = []
     wind_profiles = []
@@ -156,10 +177,11 @@ if run_HOPP:
     save_df = []
     dfs = []
 
-    n_runs = len(hopp_files) * len(ramp_lims) * len(turndowns)
     n_runs = len(hopp_files) * len(rltd)
 
     print(f"{n_runs} runs planned.")
+    print(f"Save path is: {save_path}")
+    # input("Press enter in terminal to continue")
 
     count = 1
 
@@ -170,7 +192,7 @@ if run_HOPP:
         year = int(hopp_file.split("_")[0][4:])
         lat = float(hopp_file.split("_")[1][3:])
         lon = float(hopp_file.split("_")[2][3:])
-        split = int(hopp_file.split("_")[-1].split(".")[0][7:])
+        split = int(hopp_file.split("_")[3][7:])  # .split(".")[0][7:])
         hopp_input = (
             Path(__file__).parents[1] / "inputs" / "HOPP_sweep_inputs" / hopp_file
         )

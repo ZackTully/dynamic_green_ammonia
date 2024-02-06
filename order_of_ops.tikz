@@ -1,0 +1,147 @@
+
+%%% Preamble Requirements %%%
+% \usepackage{geometry}
+% \usepackage{amsfonts}
+% \usepackage{amsmath}
+% \usepackage{amssymb}
+% \usepackage{tikz}
+
+% Optional packages such as sfmath set through python interface
+% \usepackage{sfmath}
+
+% \usetikzlibrary{arrows,chains,positioning,scopes,shapes.geometric,shapes.misc,shadows}
+
+%%% End Preamble Requirements %%%
+
+\input{"/opt/anaconda3/envs/HOPP_GS/lib/python3.8/site-packages/pyxdsm/diagram_styles"}
+\begin{tikzpicture}
+
+\matrix[MatrixSetup]{
+%Row 0
+&
+\node [DataIO] (output_size_gen) {$\begin{array}{c}Wind cap. \\ PV cap. \\ EL cap.\end{array}$};&
+\node [DataIO] (output_sim_gen) {$\begin{array}{c}Wind\hspace{1mm}resource \\ Solar\hspace{1mm}resource\end{array}$};&
+\node [DataIO] (output_size_end) {$\begin{array}{c}Turndown\hspace{1mm}f_T \\ Ramping\hspace{1mm}f_R\end{array}$};&
+&
+&
+&
+&
+\\
+%Row 1
+&
+\node [DOE] (size_gen) {$\begin{array}{c}1.\hspace{1mm}Size \\ generation\end{array}$};&
+\node [DataInter] (size_gen-sim_gen) {$Capacity_{gen.}$};&
+&
+&
+&
+\node [DataInter] (size_gen-calc_cost) {$Capacity_{gen.}$};&
+&
+\\
+%Row 2
+&
+&
+\node [DOE] (sim_gen) {$\begin{array}{c}2.\hspace{1mm}Simulate \\ generation\end{array}$};&
+\node [DataInter] (sim_gen-size_end) {$P, H_2$};&
+\node [DataInter] (sim_gen-sched_opt) {$P, H_2$};&
+\node [DataInter] (sim_gen-size_storage) {$P, H_2$};&
+&
+&
+\\
+%Row 3
+&
+&
+&
+\node [DOE] (size_end) {$\begin{array}{c}3. Size \\ ammonia\end{array}$};&
+\node [DataInter] (size_end-sched_opt) {$Capacity_{ammonia}$};&
+&
+\node [DataInter] (size_end-calc_cost) {$Capacity_{ammonia}$};&
+&
+\\
+%Row 4
+&
+&
+&
+&
+\node [Optimization] (sched_opt) {$\begin{array}{c}4.\hspace{1mm}Scheduling \\ Optimization\end{array}$};&
+\node [DataInter] (sched_opt-size_storage) {$H_2\hspace{1mm}demand$};&
+&
+\node [DataInter] (sched_opt-calc_LCOA) {$Ammonia$};&
+\\
+%Row 5
+&
+&
+&
+&
+&
+\node [DOE] (size_storage) {$\begin{array}{c}5.\hspace{1mm}Size \\ storage\end{array}$};&
+\node [DataInter] (size_storage-calc_cost) {$Capacity_{storage}$};&
+&
+\\
+%Row 6
+&
+&
+&
+&
+&
+&
+\node [DOE] (calc_cost) {$\begin{array}{c}6.\hspace{1mm}Calculate \\ costs\end{array}$};&
+\node [DataInter] (calc_cost-calc_LCOA) {$Cost_{system}$};&
+\\
+%Row 7
+\node [DataIO] (left_output_calc_LCOA) {$LCOA$};&
+&
+&
+&
+&
+&
+&
+\node [DOE] (calc_LCOA) {$\begin{array}{c}7.\hspace{1mm}Calculate \\ LCOA\end{array}$};&
+\\
+%Row 8
+&
+&
+&
+&
+&
+&
+&
+&
+\\
+};
+
+% XDSM process chains
+
+
+\begin{pgfonlayer}{data}
+\path
+% Horizontal edges
+(size_gen) edge [DataLine] (size_gen-sim_gen)
+(sim_gen) edge [DataLine] (sim_gen-size_end)
+(sim_gen) edge [DataLine] (sim_gen-sched_opt)
+(size_end) edge [DataLine] (size_end-sched_opt)
+(sim_gen) edge [DataLine] (sim_gen-size_storage)
+(sched_opt) edge [DataLine] (sched_opt-size_storage)
+(size_gen) edge [DataLine] (size_gen-calc_cost)
+(size_end) edge [DataLine] (size_end-calc_cost)
+(size_storage) edge [DataLine] (size_storage-calc_cost)
+(sched_opt) edge [DataLine] (sched_opt-calc_LCOA)
+(calc_cost) edge [DataLine] (calc_cost-calc_LCOA)
+(calc_LCOA) edge [DataLine] (left_output_calc_LCOA)
+% Vertical edges
+(size_gen-sim_gen) edge [DataLine] (sim_gen)
+(sim_gen-size_end) edge [DataLine] (size_end)
+(sim_gen-sched_opt) edge [DataLine] (sched_opt)
+(size_end-sched_opt) edge [DataLine] (sched_opt)
+(sim_gen-size_storage) edge [DataLine] (size_storage)
+(sched_opt-size_storage) edge [DataLine] (size_storage)
+(size_gen-calc_cost) edge [DataLine] (calc_cost)
+(size_end-calc_cost) edge [DataLine] (calc_cost)
+(size_storage-calc_cost) edge [DataLine] (calc_cost)
+(sched_opt-calc_LCOA) edge [DataLine] (calc_LCOA)
+(calc_cost-calc_LCOA) edge [DataLine] (calc_LCOA)
+(size_gen) edge [DataLine] (output_size_gen)
+(sim_gen) edge [DataLine] (output_sim_gen)
+(size_end) edge [DataLine] (output_size_end);
+\end{pgfonlayer}
+
+\end{tikzpicture}

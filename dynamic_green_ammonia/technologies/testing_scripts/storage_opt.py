@@ -11,8 +11,8 @@ rootdir = Path(__file__).parents[2]
 H2_gen = np.load(Path(__file__).parents[2] / "data" / "heatmap_runs" / "H2_gen.npy")
 H2_gen = H2_gen[0, :]
 
-N = 250
-# N = len(H2_gen)
+# N = 250
+N = len(H2_gen)
 
 # shift = 0
 # H2_gen = H2_gen[shift : N + shift]
