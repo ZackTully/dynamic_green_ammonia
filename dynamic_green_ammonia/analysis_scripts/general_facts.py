@@ -72,6 +72,7 @@ N2_color = (97 / 255, 6 / 255, 13 / 255)
 P_color = (166 / 255, 161 / 255, 161 / 255)
 
 EL_color = (244 / 255, 228 / 255, 84 / 255)
+EL_color = "blue"
 ASU_color = (189 / 255, 80 / 255, 119 / 255)
 
 fig = plt.figure(figsize=(3.5, 3))
@@ -93,7 +94,7 @@ sankey = Sankey(
     margin=0,
     shoulder=0.0,
     head_angle=120,
-    offset=2,
+    offset=2.5,
     format=lambda x: f"{np.abs(x):.3f}",
     unit=None,
 )
@@ -101,7 +102,12 @@ sankey.add(
     flows=[engy_pkg[0], engy_pkg[1], engy_pkg[2], -total_engy],
     orientations=[0, -1, 1, 0],
     pathlengths=[3, 1, 1, 4],
-    labels=[None, None, None, "NH$_3$\n1 kg"],
+    labels=[
+        f"H$_2$\n{mass_frac[0]:.3f} kg",
+        f"N$_2$\n{mass_frac[1]:.3f} kg",
+        None,
+        "NH$_3$\n1 kg",
+    ],
     facecolor=hbr_color,
     edgecolor=hbr_color,
 )
@@ -112,13 +118,15 @@ sankey.add(
     orientations=[0, 0],
     prior=0,
     connect=(0, 0),
-    pathlengths=[2, 2],
+    pathlengths=[3, 3],
     labels=[
-        f"H$_2$\n{mass_frac[0]:.3f} kg",
+        # f"H$_2$\n{mass_frac[0]:.3f} kg",
+        None,
         f"Electrolyzer\n{engy_pkg[0]:.3f} kWh",
     ],
     facecolor=EL_color,
     edgecolor=EL_color,
+    
 )
 sankey.add(
     flows=[-engy_pkg[1], engy_pkg[1]],
@@ -126,7 +134,11 @@ sankey.add(
     prior=0,
     connect=(1, 0),
     pathlengths=[1, 6],
-    labels=[f"N$_2$\n{mass_frac[1]:.3f} kg", f"ASU\n{engy_pkg[1]:.3f} kWh"],
+    labels=[
+        # f"N$_2$\n{mass_frac[1]:.3f} kg",
+        None,
+        f"ASU\n{engy_pkg[1]:.3f} kWh",
+    ],
     facecolor=ASU_color,
     edgecolor=ASU_color,
 )

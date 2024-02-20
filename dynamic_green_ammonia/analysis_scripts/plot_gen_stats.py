@@ -8,13 +8,22 @@ import calendar
 from datetime import datetime
 import seaborn
 
+from dynamic_green_ammonia.tools.file_management import FileMan
+
+FM = FileMan()
+FM.set_analysis_case("heat")
+
+
+
+
 year = 2012
-style = "paper"
+# style = "paper"
+style = "pres"
 
 if style == "paper":
     plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 elif style == "pres":
-    plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
+    plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 
 data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
 # data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
@@ -132,18 +141,18 @@ def time_difference(profile, time_diff):
     return max_diff
 
 
-fig, ax = plt.subplots(1, 1)
+# fig, ax = plt.subplots(1, 1)
 
-tx_diff = []
-ia_diff = []
+# tx_diff = []
+# ia_diff = []
 
-diffs = np.linspace(150, 800, 50).astype(int)
-for diff in diffs:
-    tx_diff.append(time_difference(gen_profiles[:, 0], diff))
-    ia_diff.append(time_difference(gen_profiles[:, 1], diff))
+# diffs = np.linspace(150, 800, 50).astype(int)
+# for diff in diffs:
+#     tx_diff.append(time_difference(gen_profiles[:, 0], diff))
+#     ia_diff.append(time_difference(gen_profiles[:, 1], diff))
 
-ax.plot(diffs, tx_diff, ".-")
-ax.plot(diffs, ia_diff, ".-")
+# ax.plot(diffs, tx_diff, ".-")
+# ax.plot(diffs, ia_diff, ".-")
 
 
 def plot_mean_std(profile, ax, plot_caret):
@@ -197,27 +206,108 @@ def plot_mean_std(profile, ax, plot_caret):
     )
 
 
-fig, ax = plt.subplots(1, 3, sharey="all", sharex="all", figsize=(7.2, 3))
-plot_mean_std(wind_profiles, ax[0], False)
-plot_mean_std(solar_profiles, ax[1], False)
-plot_mean_std(gen_profiles, ax[2], True)
-ax[1].legend()
+if style == "paper":
+    fig, ax = plt.subplots(1, 3, sharey="all", sharex="all", figsize=(7.2, 3))
+    plot_mean_std(wind_profiles, ax[0], False)
+    plot_mean_std(solar_profiles, ax[1], False)
+    plot_mean_std(gen_profiles, ax[2], True)
+    ax[1].legend()
 
-ax[0].set_title("Wind generation")
-ax[1].set_title("Solar generation")
-ax[2].set_title("Hybrid generation")
-ax[0].set_xticks(np.arange(0, 8760, 2400))
-ax[0].set_ylabel("MW")
+    ax[0].set_title("Wind generation")
+    ax[1].set_title("Solar generation")
+    ax[2].set_title("Hybrid generation")
+    ax[0].set_xticks(np.arange(0, 8760, 2400))
+    ax[0].set_ylabel("MW")
 
-for axis in ax:
-    axis.set_xlabel("Hour")
+    for axis in ax:
+        axis.set_xlabel("Hour")
 
-fig.tight_layout()
-fig.savefig(
-    save_path / "generation_statistics/wind_solar_hybrid_stats.png",
-    format="png",
-    dpi=300,
-)
+    fig.tight_layout()
+    fig.savefig(
+        save_path / "generation_statistics/wind_solar_hybrid_stats.png",
+        format="png",
+        dpi=300,
+    )
+
+elif style == "pres":
+
+    fig, ax = plt.subplots(1, 1, figsize=(7.2, 3.5), layout="constrained")
+
+    factor = 1e-3
+
+    profile = factor * gen_profiles[:, 1]
+
+
+    widths = [
+        2,
+        24,
+        24 * 7,
+        24 * 30,
+        24 * 30 * 3,
+        # 24 * 30 * 6,
+    ]
+    lws = [0.25, 0.5, 0.75, 1, 1.5, 2]
+    alphas = [0.125, 0.25, 0.5, 0.75, 0.9, 1]
+
+    prof_mean = np.mean(profile)*np.ones(len(profile))
+
+    width = 30
+    prof_kwargs = {"color": "blue"}
+
+    ax.plot(profile, linewidth=0.5, alpha=0.125, **prof_kwargs, label="Hourly")
+    # for i, width in enumerate(widths):
+
+    width = 24*30*3
+    ma, std, intervals = LPF_ma(profile, width)
+    ax.fill_between(np.linspace(0, 8760, 8760), prof_mean, ma, color="blue", alpha=.125)
+    ax.plot(prof_mean, linewidth=1, alpha=1, linestyle="dashdot", **prof_kwargs, label="Mean")
+    ax.hlines([np.min(ma), np.max(ma)], 0, len(profile), linestyle="dashed", color="black", linewidth=.5)
+    ax.plot(ma, linewidth=2, alpha=.9, **prof_kwargs, label="3-month avg.")
+    
+
+    
+
+    ax.legend(loc="upper right")
+
+    
+    ax.set_xlabel("Time [hr]")
+    ax.set_ylabel("Energy generation [MWh]")
+
+    fig.savefig(FM.plot_path / "presentation_plots" / "variability_no_ylim.png", format="png")
+
+    ax.set_ylim([2e2, 3.75e2])
+    fig.savefig(FM.plot_path / "presentation_plots" / "variability_ylim.png", format="png")
+
+
+    plt.close(fig)
+
+    fig, ax = plt.subplots(6, 1, sharey="col", dpi=150)
+
+    prof = profile - np.mean(profile)
+    ax[0].plot(prof)
+    
+
+    total = 0
+
+    for (
+        i,
+        width,
+    ) in enumerate(np.flip(widths)):
+        
+        # ma, std, intervals = LPF_ma(prof, width)
+        ma, std, intervals = LPF_ma(prof, width)
+        ax[i + 1].plot(prof-ma, linewidth=.5, alpha=.5, color="orange")
+        ax[i + 1].plot(ma, linewidth=lws[0], alpha=alphas[i + 1], **prof_kwargs)
+        storage = np.cumsum(prof-ma).max() - np.cumsum(prof-ma).min()
+        ax[i + 1].set_ylabel(f"{storage:.2e}")
+
+        total += storage
+
+        # prof = prof - ma
+
+    fig.subplots_adjust(hspace=0)
+
+    []
 
 
 []

@@ -7,11 +7,12 @@ import pandas as pd
 from pathlib import Path
 
 style = "paper"
+style = "pres"
 
 if style == "paper":
     plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 elif style == "pres":
-    plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
+    plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 
 
 # data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
@@ -134,7 +135,7 @@ def plot_bars(ax, x, df, tech):
     # ax.set_xticks(np.linspace(1, 0, 5), minor=True)
     # ax.set_xticks(np.linspace(2, 1, 3))
 
-    ax.invert_xaxis()
+    # ax.invert_xaxis()
     ax.set_xlabel("$f_T$")
 
     ax.grid(True, axis="y", which="both", alpha=0.25)
@@ -143,7 +144,7 @@ def plot_bars(ax, x, df, tech):
     return handles, labels, last_y
 
 
-def add_annotations(ax, LCOA):
+def add_annotations(ax, LCOA, both):
     LCOA_BAT = np.interp(td_realistic, np.linspace(0, 1, len(LCOA)), LCOA)
     arrowprops = {"color": "black", "width": 0.5, "headwidth": 2, "headlength": 3}
 
@@ -152,15 +153,16 @@ def add_annotations(ax, LCOA):
     y_inf = 0.95 * ylim_top
     y_bat = 0.8 * ylim_top
 
-    ax.annotate(
-        "", xy=(td_realistic, LCOA_BAT), xytext=(0.51, y_bat + 5), arrowprops=arrowprops
-    )
-    ax.annotate(
-        f"BAT: {LCOA_BAT:.0f}",
-        (td_realistic, LCOA_BAT),
-        (0.5, y_bat),
-        # arrowprops=arrowprops,
-    )
+    if both:
+        ax.annotate(
+            "", xy=(td_realistic, LCOA_BAT), xytext=(0.51, y_bat + 5), arrowprops=arrowprops
+        )
+        ax.annotate(
+            f"BAT: {LCOA_BAT:.0f}",
+            (td_realistic, LCOA_BAT),
+            (0.5, y_bat),
+            # arrowprops=arrowprops,
+        )
     ax.annotate("", (1, LCOA[-1]), (0.61, y_inf + 5), arrowprops=arrowprops)
     ax.annotate(
         f"Inflexible: {LCOA[-1]:.0f}",
@@ -195,23 +197,30 @@ df_rl_constant_site1 = get_df_at_ramp_lim(
 
 x = turndowns
 fig, ax = plt.subplots(1, 3, sharex="row", sharey="row", figsize=(7.2, 3.5))
-fig.suptitle(f"LCOA")
+# fig.suptitle(f"LCOA")
 
 handles, labels, LCOA = plot_bars(ax[0], x, df_rl_constant_site0, "pipe")
 ax[0].set_ylabel("LCOA [USD/t]")
 ax[0].set_title(f"Pipe, {loc1['loc'].iloc[0]}")
-add_annotations(ax[0], LCOA)
+add_annotations(ax[0], LCOA, False)
 ax[0].text(0.025, 0.96, "a.", transform=ax[0].transAxes)
 
 handles, labels, LCOA = plot_bars(ax[1], x, df_rl_constant_site0, "salt")
 ax[1].set_title(f"Salt, {loc1['loc'].iloc[0]}")
-add_annotations(ax[1], LCOA)
+add_annotations(ax[1], LCOA, False)
 ax[1].text(0.025, 0.96, "b.", transform=ax[1].transAxes)
 
-handles, labels, LCOA = plot_bars(ax[2], x, df_rl_constant_site1, "pipe")
-ax[2].set_title(f"Pipe, {loc2['loc'].iloc[0]}")
-add_annotations(ax[2], LCOA)
-ax[2].text(0.025, 0.96, "c.", transform=ax[2].transAxes)
+ax[1].set_ylim((286.4518542378712, 635.140380203837))
+# ax[2].spines[:].set_visible(False)
+ax[2].axis("off")
+
+
+# handles, labels, LCOA = plot_bars(ax[2], x, df_rl_constant_site1, "pipe")
+# ax[2].set_title(f"Pipe, {loc2['loc'].iloc[0]}")
+# add_annotations(ax[2], LCOA)
+# ax[2].text(0.025, 0.96, "c.", transform=ax[2].transAxes)
+
+ax[0].invert_xaxis()
 
 # fig.legend(
 #     # handles[::-1],
@@ -248,10 +257,24 @@ fig.legend(
 fig.subplots_adjust(left=0.1, right=0.95, top=0.875, bottom=0.125, wspace=0.1)
 
 
-fig.savefig(save_path / f"LCOA_by_type_{style}.png", format="png")
-fig.savefig(save_path / f"LCOA_by_type_{style}.pdf", format="pdf")
+if style == "pres":
+    fig.savefig(save_path / f"LCOA_by_type_{style}_2.png", format="png")
+    # fig.savefig(save_path / f"LCOA_by_type_{style}.pdf", format="pdf")
+    ax[2].axis("on")
+    handles, labels, LCOA = plot_bars(ax[2], x, df_rl_constant_site1, "pipe")
+    ax[2].set_title(f"Pipe, {loc2['loc'].iloc[0]}")
+    add_annotations(ax[2], LCOA, True)
+    ax[2].text(0.025, 0.96, "c.", transform=ax[2].transAxes)
 
-
+    fig.savefig(save_path / f"LCOA_by_type_{style}_3.png", format="png")
+else:
+    ax[2].axis("on")
+    handles, labels, LCOA = plot_bars(ax[2], x, df_rl_constant_site1, "pipe")
+    ax[2].set_title(f"Pipe, {loc2['loc'].iloc[0]}")
+    add_annotations(ax[2], LCOA, True)
+    ax[2].text(0.025, 0.96, "c.", transform=ax[2].transAxes)
+    fig.savefig(save_path / f"LCOA_by_type_{style}.png", format="png")
+    fig.savefig(save_path / f"LCOA_by_type_{style}.pdf", format="pdf")
 
 fig, ax = plt.subplots(1, 2, sharey=True, figsize=(4, 3))
 

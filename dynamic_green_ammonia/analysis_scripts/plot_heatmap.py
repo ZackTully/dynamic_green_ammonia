@@ -6,13 +6,13 @@ import pandas as pd
 from pathlib import Path
 import scipy
 
-style = "paper"
-
+# style = "paper"
+style = "pres"
 
 if style == "paper":
     plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 elif style == "pres":
-    plt.style.use(Path(__file__).parent / "pres_figs.mplstyle")
+    plt.style.use(Path(__file__).parent / "paper_figs.mplstyle")
 
 
 # data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
@@ -25,10 +25,18 @@ df_all = pd.read_csv(data_path / "full_sweep_main_df.csv")
 df_all["H2_storage.capacity_kg"] = df_all["H2_storage.capacity_kg"] / 1e3
 lats = np.unique(df_all["HOPP.site.lat"])
 
+if style == "paper":
+    locations = ["TX", "IA"]
 
-locations = ["TX", "IA"]
+    fig, ax = plt.subplots(1, 2, sharey="row", figsize=(7.2, 3.5))  # , dpi=150)
 
-fig, ax = plt.subplots(1, 2, sharey="row", figsize=(7.2, 3.5))  # , dpi=150)
+elif style == "pres":
+    locations = ["IA"]
+    lats = [lats[1]]
+    fig, ax = plt.subplots(1, 1, sharey="row", figsize=(4.25, 3.5))  # , dpi=150)
+    ax = [ax]
+
+
 
 for i, loc in enumerate(locations):
     main_df = df_all[df_all["HOPP.site.lat"] == lats[i]]
@@ -237,13 +245,20 @@ for i, loc in enumerate(locations):
 ax[0].yaxis.set_major_formatter("{x:.1f}")
 ax[0].set_ylabel("Turndown flexibility $f_T$")
 
+
 sp_top = 0.9
 sp_bottom = 0.125
 sp_right = 0.825
 sp_wspace = 0.125
+sp_left = 0.08
+
+if style == "pres":
+    sp_left = 0.125
+    sp_right = 0.77
+    ax[0].set_title("")
 
 fig.subplots_adjust(
-    left=0.08, bottom=sp_bottom, right=sp_right, top=sp_top, wspace=sp_wspace
+    left=sp_left, bottom=sp_bottom, right=sp_right, top=sp_top, wspace=sp_wspace
 )
 cbar_ax = fig.add_axes([sp_right + 0.025, sp_bottom, 0.05, sp_top - sp_bottom])
 cbar = fig.colorbar(CS0, cax=cbar_ax)
