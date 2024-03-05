@@ -15,6 +15,7 @@ from multiprocess import Pool  # type: ignore
 import time
 from typing import Union
 import pprint
+from scipy.optimize import fmin
 
 
 from hopp.simulation import HoppInterface
@@ -61,6 +62,7 @@ class RunDL:
         self.main_dict = {}
 
         self.HB_sizing = "fraction"
+        # self.HB_sizing = "optimal"
         self.x0 = None
         self.storage_state_zeros = []
 
@@ -176,6 +178,13 @@ class RunDL:
 
         return H2_gen
 
+    def calc_frac_out(self, d_max, td, profile):
+
+        d_min = td * d_max
+        sum_in = np.sum(profile[np.argwhere((profile > d_min) & (profile < d_max))])
+        total = np.sum(profile)
+        return 1 - (sum_in / total)
+
     def calc_demand_profile(self):
         if self.HB_sizing == "mean":
             center = np.mean(self.H2_gen)
@@ -193,6 +202,24 @@ class RunDL:
             coeffs = np.linalg.inv(A) @ b
             max_demand = coeffs[0] / (self.td + coeffs[1])
             min_demand = self.td * coeffs[0] / (self.td + coeffs[1])
+        elif self.HB_sizing == "optimal":
+            A = np.array([[1, -np.max(self.H2_gen)], [1, -np.mean(self.H2_gen)]])
+            b = np.array([0, np.mean(self.H2_gen)])
+            coeffs = np.linalg.inv(A) @ b
+            d_max = coeffs[0] / (self.td + coeffs[1])
+            # min_demand = self.td * coeffs[0] / (self.td + coeffs[1])
+            max_demand, frac_out_opt, _, _, _ = fmin(
+                self.calc_frac_out, d_max, args=(self.td, self.H2_gen), full_output=True
+            )
+            max_demand = max_demand[0]
+            if self.td >=0.98:
+                max_demand = np.mean(self.H2_gen)
+            else:
+                if max_demand < np.mean(self.H2_gen):
+                    max_demand = np.mean(self.H2_gen)*1.01
+                if self.td * max_demand > np.mean(self.H2_gen):
+                    max_demand = np.mean(self.H2_gen) * 0.99 / self.td
+            min_demand = self.td * max_demand
 
         ramp_lim = self.rl * max_demand
 
@@ -369,7 +396,7 @@ class RunDL:
                         "opex": self.ASU.opex * self.plant_life,
                     },
                     "HB": {
-                        "NH3_tot": NH3_tot,  
+                        "NH3_tot": NH3_tot,
                         "NH3_max": NH3_max,  # kg/hr
                         "P_HB_max": P_HB_max,
                         "rating_elec": self.HB.rating_elec,

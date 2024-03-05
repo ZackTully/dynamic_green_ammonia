@@ -17,6 +17,7 @@ elif style == "pres":
 
 # data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
 data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
+# data_path = Path(__file__).parents[1] / "data" / "optimal_sizing"
 save_path = Path(__file__).parents[1] / "plots"
 
 df_all = pd.read_csv(data_path / "full_sweep_main_df.csv")

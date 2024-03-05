@@ -5,7 +5,7 @@ from pathlib import Path
 from dynamic_green_ammonia.tools.file_management import FileMan
 from dynamic_green_ammonia.technologies.demand import DemandOptimization
 
-example = True
+example = False
 style = "paper"
 
 if style == "paper":
@@ -40,8 +40,8 @@ if example:
     full_flex = gen
 
 else:
-    t_start = 0
-    t_stop = 200
+    t_start = 867
+    t_stop = 920
     dt = 1
     time = np.arange(t_start, t_stop, dt)
     H2_gen = H2_gen[0, t_start:t_stop]
@@ -68,7 +68,7 @@ else:
         DO = DemandOptimization(H2_gen, rl * max_demand, min_demand, max_demand)
         x, success, res = DO.optimize()
         demand = x[0:N]
-        storage = x[N:2*N]
+        storage = x[N : 2 * N]
 
         demands.append(demand)
         storages.append(storage)
@@ -157,9 +157,9 @@ else:
         [d_constraints[0][0], d_constraints[0][1]], time[0], time[-1], **hline_kwargs
     )
 
-    text_offset = 300
-    ax1[0].text(0, d_constraints[0][0] + text_offset, "$\\underline{d}$")
-    ax1[0].text(0, d_constraints[0][1] + text_offset, "$\\overline{d}$")
+    text_offset = 250
+    ax1[0].text(t_start, d_constraints[0][0] + text_offset, "$\\underline{d}$")
+    ax1[0].text(t_start, d_constraints[0][1] + text_offset, "$\\overline{d}$")
 
     fig2, ax2 = plt.subplots(2, 1, **sp_kwargs)
     _, _ = make_plot(ax2, time, gen, demands[1], "Turndown constraint", storages[1])
@@ -168,14 +168,13 @@ else:
         [d_constraints[1][0], d_constraints[1][1]], time[0], time[-1], **hline_kwargs
     )
 
-    ax2[0].text(0, d_constraints[1][0] + text_offset, "$\\underline{d}$")
-    ax2[0].text(0, d_constraints[1][1] + text_offset, "$\\overline{d}$")
+    ax2[0].text(t_start, d_constraints[1][0] + text_offset, "$\\underline{d}$")
+    ax2[0].text(t_start, d_constraints[1][1] + text_offset, "$\\overline{d}$")
 
     y_low = np.min([ax1[1].get_ylim()[0], ax2[1].get_ylim()[0]])
     y_high = np.max([ax1[1].get_ylim()[1], ax2[1].get_ylim()[1]])
     ax1[1].set_ylim([y_low, y_high])
     ax2[1].set_ylim([y_low, y_high])
-
 
     for fig in [fig1, fig2]:
         fig.subplots_adjust(**sp_adj)
@@ -186,6 +185,47 @@ else:
             format="png",
         )
 
+    fig, ax = plt.subplots(2, 1, **sp_kwargs, sharey="col", layout="constrained")
+    for axis in ax:
+        axis.spines[
+            [
+                "top",
+                # "left",
+                # "bottom",
+                "right",
+            ]
+        ].set_visible(False)
+        axis.spines[:].set_color("gray")
+        axis.spines[:].set_alpha(0.25)
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+    ax[0].fill_between(time, gen, demands[0], alpha=0.25, color=storage_color)
+    ax[0].plot(time, gen, label="Generation", color="blue")
+    ax[0].plot(time, demands[0], label="NH$_3$ plant", color=hbr_color)
+
+    ax[1].fill_between(time, gen, demands[1], alpha=0.25, color=storage_color)
+    ax[1].plot(time, gen, label="Generation", color="blue")
+    ax[1].plot(time, demands[1], label="NH$_3$ plant", color=hbr_color)
+    ax[1].hlines(
+        [d_constraints[1][0], d_constraints[1][1]], time[0], time[-1], **hline_kwargs
+    )
+
+    ax[1].text(t_start, d_constraints[1][0] + text_offset, "$\\underline{d}$")
+    ax[1].text(t_start, d_constraints[1][1] + text_offset, "$\\overline{d}$")
+
+    ax[0].set_ylabel("Inputs")
+    ax[1].set_ylabel("Inputs")
+    ax[1].set_xlabel("Time")
+    ax[0].set_xlabel("Time")
+
+    leg_kwargs = {"loc": "upper right", "frameon": False}
+    ax[0].legend(**leg_kwargs)
+    ax[1].legend(**leg_kwargs)
+    ax[0].set_title("Ramping constraint")
+    ax[1].set_title("Turndown constraint")
+    fig.subplots_adjust(hspace=0.2)
+    fig.savefig(FM.plot_path / "presentation_plots" / "flex_cons_stacks.png", format="png")
 []
 # fig, ax = plt.subplots(2, 2, figsize=(7.2, 3.5), sharex="col", sharey="row")
 

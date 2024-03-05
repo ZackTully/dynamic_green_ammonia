@@ -17,6 +17,7 @@ elif style == "pres":
 
 # data_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
 data_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
+# data_path = Path(__file__).parents[1] / "data" / "optimal_sizing"
 save_path = Path(__file__).parents[1] / "plots"
 input_path = Path(__file__).parents[1] / "inputs"
 
@@ -184,7 +185,7 @@ td_realistic = 0.6
 site_type = "CF and storage"
 
 loc1 = loc_df[(loc_df["loc"] == "TX") & (loc_df["note"] == site_type)]
-loc2 = loc_df[(loc_df["loc"] == "IA") & (loc_df["note"] == site_type)]
+loc2 = loc_df[(loc_df["loc"] == "IA")] # & (loc_df["note"] == site_type)]
 
 
 df_rl_constant_site0 = get_df_at_ramp_lim(

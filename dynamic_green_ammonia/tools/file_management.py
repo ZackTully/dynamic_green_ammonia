@@ -30,9 +30,9 @@ class FileMan:
         return df_all, df_full
 
     def load_gen_data(self):
-        gp = np.load(self.data_path / "H2_gen.npy").T
-        wp = np.load(self.data_path / "wind_gen.npy").T
-        sp = np.load(self.data_path / "solar_gen.npy").T
+        gp = np.load(self.data_path / "H2_gen.npy")
+        wp = np.load(self.data_path / "wind_gen.npy")
+        sp = np.load(self.data_path / "solar_gen.npy")
         return gp, wp, sp
 
 

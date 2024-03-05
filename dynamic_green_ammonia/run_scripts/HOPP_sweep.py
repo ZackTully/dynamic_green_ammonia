@@ -13,6 +13,7 @@ from dynamic_green_ammonia.technologies.Run_DL import RunDL, FlexibilityParamete
 # save_path = Path(__file__).parents[1] / "data" / "heatmap_runs"
 # save_path = Path(__file__).parents[1] / "data" / "LCOA_runs"
 save_path = Path(__file__).parents[1] / "data" / "cases_check"
+save_path = Path(__file__).parents[1] / "data" / "optimal_sizing"
 
 input_path = Path(__file__).parents[1] / "inputs"
 
@@ -66,6 +67,7 @@ if generate_HOPP_files:
     data_path = Path(__file__).parent / "data" / "HOPP_sweep"
 
     run_type = str(save_path).split("/")[-1]
+    run_type = "LCOA"
 
     if "cases" in run_type:
         print("Analysis type: CHECK CASES")
